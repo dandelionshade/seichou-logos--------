@@ -1,0 +1,36 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/seichou_logos
+    username: postgres
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: true
+
+deepseek:
+  api:
+    key: ${DEEPSEEK_API_KEY:your_default_key_here}
+    url: https://api.deepseek.com/chat/completions
+
+# Swagger UI Path
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+# 自定义应用配置 (Security & JWT)
+application:
+  security:
+    jwt:
+      # JWT 签名密钥 (必须是 Base64 编码，且长度至少 256 bit / 32 bytes)
+      # 这里提供一个默认的用于测试的密钥，生产环境必须通过环境变量注入！
+      secret-key: ${JWT_SECRET_KEY:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      # Token 过期时间 (毫秒)，默认 24 小时 (86400000 ms)
+      expiration: ${JWT_EXPIRATION:86400000}

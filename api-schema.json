@@ -1,0 +1,398 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Seichou-Logos API",
+    "description": "API schema for the Seichou-Logos project to assist in backend Java object generation and local development.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000/api",
+      "description": "Development Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "email": { "type": "string" },
+          "name": { "type": "string" },
+          "bio": { "type": "string" },
+          "role": { "type": "string" },
+          "joinedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Checkpoint": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "completed": { "type": "boolean" }
+        }
+      },
+      "Card": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "category": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "status": { "type": "string" },
+          "checkpoints": { "type": "array", "items": { "$ref": "#/components/schemas/Checkpoint" } },
+          "progress": { "type": "integer" }
+        }
+      },
+      "Stats": {
+        "type": "object",
+        "properties": {
+          "level": { "type": "integer" },
+          "vitalityExp": { "type": "integer" },
+          "flowExp": { "type": "integer" },
+          "sparkExp": { "type": "integer" },
+          "echoExp": { "type": "integer" },
+          "resilienceExp": { "type": "integer" },
+          "maxExp": { "type": "integer" },
+          "unlockedBadges": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "Preferences": {
+        "type": "object",
+        "properties": {
+          "theme": { "type": "string" },
+          "language": { "type": "string" },
+          "aiPersonality": { "type": "string" },
+          "notificationsEnabled": { "type": "boolean" },
+          "dataPrivacy": { "type": "string" }
+        }
+      },
+      "ChatMessage": {
+        "type": "object",
+        "properties": {
+          "role": { "type": "string" },
+          "content": { "type": "string" }
+        }
+      },
+      "ReframeRequest": {
+        "type": "object",
+        "properties": {
+          "content": { "type": "string" },
+          "therapyMode": { "type": "string" }
+        },
+        "required": ["content"]
+      },
+      "ReframeResponse": {
+        "type": "object",
+        "properties": {
+          "primary_emotion": { "type": "string" },
+          "reframed_insight": { "type": "string" },
+          "growth_assets": {
+            "type": "object",
+            "additionalProperties": { "type": "integer" }
+          },
+          "ai_insight_details": {
+            "type": "object",
+            "properties": {
+              "real_need": { "type": "string" },
+              "recommendation": { "type": "string" }
+            }
+          }
+        }
+      },
+      "ChatRequest": {
+        "type": "object",
+        "properties": {
+          "messages": { "type": "array", "items": { "$ref": "#/components/schemas/ChatMessage" } },
+          "userContext": { "type": "object" },
+          "therapyMode": { "type": "string" }
+        },
+        "required": ["messages"]
+      },
+      "ChatResponse": {
+        "type": "object",
+        "properties": {
+          "reply": { "type": "string" },
+          "action": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "type": { "type": "string" },
+              "data": { "$ref": "#/components/schemas/Card" }
+            }
+          }
+        }
+      },
+      "SettleRequest": {
+        "type": "object",
+        "properties": {
+          "cards": { "type": "array", "items": { "$ref": "#/components/schemas/Card" } },
+          "feeling": { "type": "string" }
+        },
+        "required": ["cards"]
+      },
+      "SettleResponse": {
+        "type": "object",
+        "properties": {
+          "vitality_exp": { "type": "integer" },
+          "flow_exp": { "type": "integer" },
+          "spark_exp": { "type": "integer" },
+          "echo_exp": { "type": "integer" },
+          "resilience_exp": { "type": "integer" },
+          "compassionate_summary": { "type": "string" },
+          "newlyUnlockedBadges": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "LowBatteryResponse": {
+        "type": "object",
+        "properties": {
+          "expGained": { "type": "integer" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "summary": "Register/Login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": { "type": "string" },
+                    "user": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/board/cards": {
+      "get": {
+        "summary": "Get all cards",
+        "responses": {
+          "200": {
+            "description": "List of cards",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Card" } }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create new card",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/Card" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created card",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Card" } }
+            }
+          }
+        }
+      }
+    },
+    "/board/cards/{id}": {
+      "put": {
+        "summary": "Update a card",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/Card" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated card",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Card" } }
+            }
+          }
+        }
+      }
+    },
+    "/board/stats": {
+      "get": {
+        "summary": "Get user stats",
+        "responses": {
+          "200": {
+            "description": "User stats",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Stats" } }
+            }
+          }
+        }
+      }
+    },
+    "/preferences": {
+      "get": {
+        "summary": "Get user preferences",
+        "responses": {
+          "200": {
+            "description": "Preferences",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Preferences" } }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update preferences",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/Preferences" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated preferences",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Preferences" } }
+            }
+          }
+        }
+      }
+    },
+    "/reframe": {
+      "post": {
+        "summary": "AI Emotion Reframing",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ReframeRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reframe insights",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ReframeResponse" } }
+            }
+          }
+        }
+      }
+    },
+    "/chat": {
+      "post": {
+        "summary": "AI Chat",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ChatRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI Chat reply",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ChatResponse" } }
+            }
+          }
+        }
+      }
+    },
+    "/settle": {
+      "post": {
+        "summary": "AI Gamified Settlement",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SettleRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settlement results",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SettleResponse" } }
+            }
+          }
+        }
+      }
+    },
+    "/low-battery": {
+      "post": {
+        "summary": "AI Low Battery Support",
+        "responses": {
+          "200": {
+            "description": "Low battery comfort",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/LowBatteryResponse" } }
+            }
+          }
+        }
+      }
+    },
+    "/reports/weekly": {
+      "post": {
+        "summary": "Generate AI Weekly Soul Profile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "logs": { "type": "array", "items": { "type": "object" } },
+                  "cards": { "type": "array", "items": { "$ref": "#/components/schemas/Card" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Markdown formatted weekly report",
+            "content": {
+              "application/json": { 
+                "schema": { 
+                  "type": "object",
+                  "properties": {
+                    "markdown": { "type": "string" }
+                  }
+                } 
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

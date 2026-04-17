@@ -1,0 +1,46 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --color-bg: #0C0C0E;
+  --color-card-bg: #16161A;
+  --color-border: #2D2D33;
+  --color-ink-dim: #71717A;
+  --color-ink: #E4E4E7;
+  --color-accent-glow: #88D66C;
+  --color-vision: #FACC15;
+  --color-negative-tint: #FF6B6B;
+
+  --font-sans: "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "Georgia", "Hiragino Mincho ProN", serif;
+}
+
+@layer base {
+  body {
+    @apply bg-bg text-ink font-sans;
+  }
+
+  /* Custom Scrollbar Styling */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full transition-colors;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-dim;
+  }
+
+  /* Firefox support */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+}

@@ -1,0 +1,579 @@
+import { createI18n } from 'vue-i18n';
+
+// 定义多语言的翻译字典 (Messages)
+const messages = {
+  en: {
+    nav: {
+      dailyLogs: 'Record Journey',
+      growthAssets: 'Journey Log',
+      aiReports: 'Soul Profile',
+      wisdomChat: 'Wisdom Chat',
+      settings: 'Preferences',
+      profile: 'User Profile'
+    },
+    dimension: {
+      health: { label: 'Vitality', sub: 'Fuel for the body' },
+      mind: { label: 'Flow', sub: 'Peace for the soul' },
+      career: { label: 'Sparks', sub: 'Learning & Creativity' },
+      social: { label: 'Echo', sub: 'Connection with the world' }
+    },
+    dashboard: {
+      title: 'Growth Kanban',
+      subtitle: 'Log your life. Mark as done to gain EXP.',
+      kanbanView: 'Kanban View',
+      listView: 'List View',
+      lowBattery: 'Low Battery',
+      add: 'Add',
+      settleDay: 'Settle Day',
+      progress: 'Progress',
+      noEntries: 'No entries here.',
+      more: '+ {count} more...',
+      selfCareMode: 'Self-Care Mode Activated',
+      levelUpSummary: 'Level Up Summary',
+      resilienceExp: 'Resilience EXP',
+      physicalExp: 'Physical EXP',
+      mentalExp: 'Mental EXP',
+      standard: 'Standard',
+      standardSettle: 'Standard Settlement',
+      persistenceAward: '+ Persistence Award',
+      acceptanceAward: '+ Acceptance Award'
+    },
+    experience: {
+      title: 'How was the experience?',
+      subtitle: 'Be honest with yourself. Every experience is growth.',
+      record: 'Record Experience',
+      smooth: 'Smoothly Done',
+      smoothDesc: 'Everything went as planned.',
+      struggled: 'Struggled',
+      struggledDesc: 'It was painful, or only did a little bit.',
+      composted: 'Composted',
+      compostedDesc: 'It is okay. Throw failures into the compost for next time.'
+    },
+    edit: {
+      title: 'Title',
+      description: 'Description...',
+      category: 'Category',
+      tags: 'Tags (Enter to add)',
+      checkpoints: 'Checkpoints',
+      addCheckpoint: 'Add a sub-task...',
+      save: 'Save Changes',
+      addToKanban: 'Add to Kanban',
+      cancel: 'Cancel'
+    },
+    insight: {
+      title: 'Weekly Insight',
+      content: 'Your "Stress Metabolism" has increased by 15% this week. Reframing anxiety into preparation is becoming a habit.'
+    },
+    header: {
+      dashboard: 'Dashboard',
+      eventLog: 'Event Log',
+      system: 'System Online',
+      database: 'DB Sync: OK'
+    },
+    modes: {
+      adlerian: 'Adlerian',
+      cbt: 'CBT',
+      mindfulness: 'Mindfulness'
+    },
+    log: {
+      latestEntry: 'Latest Entry',
+      emotion: 'Negative Emotion: Anxiety',
+      content: 'I spent the whole day gaming to escape project pressure. Feeling immense self-loathing and anxiety.',
+      mentalContext: 'Mental Context',
+      intensity: 'Intensity',
+      durability: 'Durability',
+      placeholder: 'Write down your negative emotions or events today...',
+      submit: 'Analyze & Reframe',
+      analyzing: 'AI is analyzing your emotions...'
+    },
+    ai: {
+      title: 'AI Reframing Analysis',
+      success: 'Reframing Successful',
+      resultTitle: 'Anxiety as a Catalyst for Preparation',
+      resultDesc: 'Your anxiety stems from a high standard for the project. The escapism (gaming) was a coping mechanism for cognitive overload. Acknowledging this is the first step of stress metabolism.',
+      assets: {
+        selfAwareness: 'Recognizing escapism',
+        stressMetabolism: 'Processing anxiety',
+        reflectiveCapacity: 'Analyzing root causes'
+      },
+      recommendationTitle: 'Actionable Recommendation',
+      recommendationDesc: 'Break the project into micro-tasks (15 mins each). Start with the easiest one tomorrow morning to build momentum and reduce the cognitive load that triggers escapism.',
+      note: 'AI analysis is based on Adlerian psychology and CBT frameworks. Use it as a tool for self-reflection, not medical advice.'
+    },
+    history: {
+      title: 'Quantified Progress',
+      subtitle: 'Visualize your personal growth journey through data.',
+      empty: 'No history logs yet. Start by recording your journey in the Dashboard.',
+      date: 'Date',
+      emotion: 'Emotion',
+      totalLogs: 'Total Logs',
+      tasksDone: 'Tasks Done',
+      longTermGoals: 'Long-term Goals',
+      growthStreak: 'Growth Streak',
+      activityTrend: 'Activity Trend (Last 7 Days)',
+      heatmap: 'Growth Heatmap',
+      milestones: 'Strategic Milestones',
+      logs: 'Historical Logs',
+      days: 'Days',
+      showing: 'Showing {start} to {end} of {total} entries',
+      page: 'Page {current} of {total}',
+      reframedInsight: 'Reframed Insight'
+    },
+    reports: {
+      title: 'Soul Profile',
+      subtitle: 'AI-driven character analysis and psychological insights.',
+      lastSync: 'Last Sync: {time}',
+      growthBalance: 'Growth Balance',
+      aiInsight: 'AI Insight',
+      coreTraits: 'Core Character Traits',
+      growthAssetsGained: 'Growth Assets Gained',
+      weeklySynthesis: 'Weekly Growth Synthesis',
+      downloadReport: 'Download Full Report',
+      shareInsights: 'Share Insights',
+      correlation: 'Emotion & Growth Index Correlation',
+      traits: {
+        resilience: 'Resilience',
+        courage: 'Courage',
+        selfAwareness: 'Self-Awareness',
+        empathy: 'Empathy',
+        patience: 'Patience',
+        physical: 'Physical',
+        mental: 'Mental',
+        social: 'Social',
+        skill: 'Skill',
+        master: 'Master',
+        expert: 'Expert',
+        adept: 'Adept'
+      }
+    },
+    settings: {
+      title: 'Preferences',
+      subtitle: 'Customize your Seichou-Logos experience.',
+      save: 'Save Changes',
+      success: 'Settings saved successfully. Your preferences have been updated.',
+      appearance: 'Appearance',
+      theme: 'Theme Preference',
+      light: 'Light',
+      dark: 'Dark',
+      language: 'Language',
+      aiPersonality: 'AI Personality',
+      mentorStyle: 'Mentor Style',
+      empathetic: 'Empathetic (Warm)',
+      strict: 'Strict (Stoic)',
+      philosophical: 'Philosophical (Deep)',
+      notifications: 'Notifications',
+      dailyReminders: 'Daily Reminders',
+      privacy: 'Privacy & Data',
+      dataProcessing: 'AI Data Processing',
+      export: 'Export Data',
+      clearAll: 'Clear All',
+      clearConfirm: 'Are you sure you want to clear all local data? This action cannot be undone.'
+    },
+    chat: {
+      title: 'Continuous Counseling',
+      placeholder: 'I still feel bad...',
+      send: 'Send',
+      typing: 'AI is typing...',
+      welcome: 'Welcome to the Wisdom Chat Room. I am your personal growth mentor. How are you feeling today? I can help you analyze your progress or just listen to your thoughts.',
+      mentorOnline: 'AI Mentor Online',
+      clearHistory: 'Clear Current Session',
+      history: 'Past Reflections',
+      newChat: 'New Session',
+      noHistory: 'No reflections yet. Start a new session to record your wisdom.',
+      sessionTitle: 'Session',
+      deleteConfirm: 'Delete this reflection session?',
+      systemAction: 'System Action',
+      taskAdded: 'A new task has been added to your Kanban: "{title}"',
+      error: "I'm sorry, I'm having trouble connecting to my wisdom core right now. But I'm still here for you."
+    },
+    placeholder: {
+      title: 'Coming Soon',
+      desc: 'This feature is currently under development. The backend API is ready and waiting for integration.'
+    }
+  },
+  ja: {
+    nav: {
+      dailyLogs: '旅の記録',
+      growthAssets: 'ジャーニーログ',
+      aiReports: 'ソウルプロフィール',
+      wisdomChat: '智聊室',
+      settings: '設定',
+      profile: 'プロフィール'
+    },
+    dimension: {
+      health: { label: '元気', sub: '身体をケアする燃料' },
+      mind: { label: 'フロー', sub: '心の平穏を見つける' },
+      career: { label: 'スパーク', sub: '学びと創造に火をつける' },
+      social: { label: 'エコー', sub: '世界との温かいつながり' }
+    },
+    dashboard: {
+      title: '成長カンバン',
+      subtitle: '日々の歩みを記録し、経験値を獲得しましょう。',
+      kanbanView: 'カンバン',
+      listView: 'リスト',
+      lowBattery: 'ローバッテリー',
+      add: '追加',
+      settleDay: '一日の精算',
+      progress: '進捗',
+      noEntries: '記録がありません。',
+      more: '他 {count} 件...',
+      selfCareMode: 'セルフケアモード起動',
+      levelUpSummary: 'レベルアップの概要',
+      resilienceExp: '回復力経験値',
+      physicalExp: '身体的経験値',
+      mentalExp: '精神的経験値',
+      standard: '標準',
+      standardSettle: '標準的な精算',
+      persistenceAward: '+ 粘り強さの報酬',
+      acceptanceAward: '+ 受容の報酬'
+    },
+    experience: {
+      title: '体験はいかがでしたか？',
+      subtitle: '自分に正直に。すべての体験は成長の糧となります。',
+      record: '体験を記録する',
+      smooth: 'スムーズに完了',
+      smoothDesc: '計画通りに進みました。',
+      struggled: '苦戦した',
+      struggledDesc: '辛かった、あるいは少しだけ進めました。',
+      composted: 'コンポスト',
+      compostedDesc: '大丈夫です。失敗をコンポストに投げ入れ、次への栄養にしましょう。',
+    },
+    edit: {
+      title: 'タイトル',
+      description: '説明...',
+      category: 'カテゴリ',
+      tags: 'タグ (Enterで追加)',
+      checkpoints: 'チェックポイント',
+      addCheckpoint: 'サブタスクを追加...',
+      save: '変更を保存',
+      addToKanban: 'カンバンに追加',
+      cancel: 'キャンセル'
+    },
+    insight: {
+      title: '今週の洞察',
+      content: '今週、あなたの「ストレス代謝」が15%向上しました。焦りを準備へと再構築することが習慣になりつつあります。'
+    },
+    header: {
+      dashboard: 'ダッシュボード',
+      eventLog: 'イベントログ',
+      system: 'システムオンライン',
+      database: 'DB同期: OK'
+    },
+    modes: {
+      adlerian: 'アドラー心理学',
+      cbt: '認知行動療法(CBT)',
+      mindfulness: 'マインドフルネス'
+    },
+    log: {
+      latestEntry: '最新の記録',
+      emotion: 'ネガティブな感情: 焦燥',
+      content: '今日はプロジェクトの進捗が思わしくなく、一日中ゲームをして逃避してしまった。自己嫌悪と焦りで胸が苦しい。',
+      mentalContext: '心理コンテキスト',
+      intensity: '強度',
+      durability: '持続性',
+      placeholder: '今日のネガティブな感情や出来事を書き留めてください...',
+      submit: '分析と再構築',
+      analyzing: 'AIがあなたの感情を分析しています...'
+    },
+    ai: {
+      title: '認知再構築',
+      success: '再構築成功',
+      resultTitle: '準備の触媒としての焦燥感',
+      resultDesc: 'あなたの焦りは、プロジェクトに対する高い基準から生じています。逃避（ゲーム）は、認知的過負荷に対する対処メカニズムでした。これを認識することが、ストレス代謝の第一歩です。',
+      assets: {
+        selfAwareness: '逃避の認識',
+        stressMetabolism: '焦燥の処理',
+        reflectiveCapacity: '根本原因の分析'
+      },
+      recommendationTitle: '具体的な推奨行動',
+      recommendationDesc: 'プロジェクトをマイクロタスク（各15分）に分割しましょう。明日の朝、最も簡単なタスクから始めて勢いをつけ、逃避を引き起こす認知的負荷を減らしてください。',
+      note: 'AI分析はアドラー心理学とCBTフレームワークに基づいています。自己反省のツールとして使用し、医学的アドバイスとしては使用しないでください。'
+    },
+    history: {
+      title: '成長の定量化',
+      subtitle: 'データを通じて自己成長の旅を視覚化します。',
+      empty: '履歴ログはまだありません。ダッシュボードで記録を始めましょう。',
+      date: '日付',
+      emotion: '感情',
+      totalLogs: '総ログ数',
+      tasksDone: '完了タスク',
+      longTermGoals: '長期目標',
+      growthStreak: '継続日数',
+      activityTrend: 'アクティビティトレンド (過去7日間)',
+      heatmap: '成長ヒートマップ',
+      milestones: '戦略的マイルストーン',
+      logs: '履歴ログ',
+      days: '日',
+      showing: '{total} 件中 {start} から {end} までを表示',
+      page: '{total} ページ中 {current} ページ目',
+      reframedInsight: 'リフレームされた洞察'
+    },
+    reports: {
+      title: 'ソウルプロフィール',
+      subtitle: 'AIによる性格分析と心理的インサイト。',
+      lastSync: '最終同期: {time}',
+      growthBalance: '成長バランス',
+      aiInsight: 'AIインサイト',
+      coreTraits: '核となる性格特性',
+      growthAssetsGained: '獲得した成長資産',
+      weeklySynthesis: '週間成長の統合',
+      downloadReport: 'レポートをダウンロード',
+      shareInsights: 'インサイトを共有',
+      correlation: '感情と成長指数の相関',
+      traits: {
+        resilience: '回復力',
+        courage: '勇気',
+        selfAwareness: '自己認識',
+        empathy: '共感',
+        patience: '忍耐',
+        physical: '身体',
+        mental: '精神',
+        social: '社交',
+        skill: 'スキル',
+        master: 'マスター',
+        expert: 'エキスパート',
+        adept: '熟練者'
+      }
+    },
+    settings: {
+      title: '設定',
+      subtitle: 'Seichou-Logosの体験をカスタマイズします。',
+      save: '変更を保存',
+      success: '設定が保存されました。',
+      appearance: '外観',
+      theme: 'テーマ設定',
+      light: 'ライト',
+      dark: 'ダーク',
+      language: '言語',
+      aiPersonality: 'AIパーソナリティ',
+      mentorStyle: 'メンタースタイル',
+      empathetic: '共感的（温かい）',
+      strict: '厳格（ストイック）',
+      philosophical: '哲学的（深い）',
+      notifications: '通知',
+      dailyReminders: '毎日のリマインダー',
+      privacy: 'プライバシーとデータ',
+      dataProcessing: 'AIデータ処理',
+      export: 'データをエクスポート',
+      clearAll: 'すべて削除',
+      clearConfirm: 'すべてのローカルデータを削除してもよろしいですか？この操作は取り消せません。'
+    },
+    chat: {
+      title: '継続的なカウンセリング',
+      placeholder: 'まだ少し辛いです...',
+      send: '送信',
+      typing: 'AIが入力中...',
+      welcome: '知恵のチャットルームへようこそ。私はあなたのパーソナル成長メンターです。今日はどのような気分ですか？進捗の分析やお話を聞くことができます。',
+      mentorOnline: 'AIメンター・オンライン',
+      clearHistory: '現在のセッションをクリア',
+      history: '過去の内省',
+      newChat: '新しいセッション',
+      noHistory: 'まだ内省の記録がありません。新しいセッションを開始して、知恵を記録しましょう。',
+      sessionTitle: 'セッション',
+      deleteConfirm: 'この内省セッションを削除しますか？',
+      systemAction: 'システムアクション',
+      taskAdded: '新しいタスクがカンバンに追加されました: "{title}"',
+      error: '申し訳ありません、現在知恵のコアに接続できません。でも、私はいつでもあなたのそばにいます。'
+    },
+    placeholder: {
+      title: '近日公開',
+      desc: 'この機能は現在開発中です。バックエンドAPIは準備完了しており、統合を待っています。'
+    }
+  },
+  zh: {
+    nav: {
+      dailyLogs: '记录旅程',
+      growthAssets: '行动轨迹',
+      aiReports: '灵魂画像',
+      wisdomChat: '智聊室',
+      settings: '偏好设置',
+      profile: '个人主页'
+    },
+    dimension: {
+      health: { label: '元气', sub: '照料好身体的燃料' },
+      mind: { label: '心流', sub: '安放好内心的宁静' },
+      career: { label: '火花', sub: '点燃学习与创造力' },
+      social: { label: '回响', sub: '感受与世界的温情' }
+    },
+    dashboard: {
+      title: '成长看板',
+      subtitle: '记录生活细节，标记完成以获得经验。',
+      kanbanView: '看板视图',
+      listView: '列表视图',
+      lowBattery: '低电量模式',
+      add: '添加',
+      settleDay: '结算今日',
+      progress: '进度',
+      noEntries: '暂无记录。',
+      more: '还有 {count} 个...',
+      selfCareMode: '自我接纳模式已激活',
+      levelUpSummary: '成长阶段结算',
+      resilienceExp: '韧性经验值',
+      physicalExp: '元气经验值',
+      mentalExp: '心流经验值',
+      standard: '标准',
+      standardSettle: '标准结算',
+      persistenceAward: '+ 坚持奖励',
+      acceptanceAward: '+ 接纳奖励'
+    },
+    experience: {
+      title: '体验如何？',
+      subtitle: '诚实记录你的感受，一切经历皆是成长。',
+      record: '记录这次体验',
+      smooth: '顺利搞定',
+      smoothDesc: '一切按计划进行。',
+      struggled: '做得很痛苦',
+      struggledDesc: '虽然痛苦，或者只做了一点点，但你坚持了。',
+      composted: '已堆肥',
+      compostedDesc: '没关系。把失败扔进堆肥箱，化作下一次的养分。',
+    },
+    edit: {
+      title: '标题',
+      description: '描述...',
+      category: '维度',
+      tags: '标签 (按回车添加)',
+      checkpoints: '自定检查点',
+      addCheckpoint: '添加子任务或里程碑...',
+      save: '保存修改',
+      addToKanban: '加入看板',
+      cancel: '取消'
+    },
+    insight: {
+      title: '本周洞察',
+      content: '本周你的“压力代谢值”提升了15%。将焦虑重构为准备动力正在成为你的习惯。'
+    },
+    header: {
+      dashboard: '控制台',
+      eventLog: '事件日志',
+      system: '系统在线',
+      database: '数据库同步: 正常'
+    },
+    modes: {
+      adlerian: '阿德勒心理学',
+      cbt: '认知行为疗法 (CBT)',
+      mindfulness: '正念与接纳 (ACT)'
+    },
+    log: {
+      latestEntry: '最新记录',
+      emotion: '负面情绪: 焦虑',
+      content: '今天项目进展不顺利，我打了一整天游戏来逃避。感到极度的自我厌恶和焦虑。',
+      mentalContext: '心理语境',
+      intensity: '强度',
+      durability: '持久度',
+      placeholder: '写下你今天的负面情绪或事件...',
+      submit: '分析与重构',
+      analyzing: 'AI 正在分析你的情绪...'
+    },
+    ai: {
+      title: 'AI 认知重构',
+      success: '重构成功',
+      resultTitle: '焦虑作为准备的催化剂',
+      resultDesc: '你的焦虑源于对项目的高标准。逃避（打游戏）是对认知过载的一种应对机制。认识到这一点是压力代谢的第一步。',
+      assets: {
+        selfAwareness: '识别逃避行为',
+        stressMetabolism: '处理焦虑情绪',
+        reflectiveCapacity: '分析根本原因'
+      },
+      recommendationTitle: '可执行的建议',
+      recommendationDesc: '将项目分解为微任务（每个15分钟）。明早从最简单的任务开始，以建立动力并减少引发逃避的认知负荷。',
+      note: 'AI 分析基于阿德勒心理学和认知行为疗法 (CBT) 框架。请将其作为自我反思的工具，而非医疗建议。'
+    },
+    history: {
+      title: '量化进步',
+      subtitle: '通过数据可视化你的个人成长旅程。',
+      empty: '暂无历史日志。请在控制台开始你的记录。',
+      date: '日期',
+      emotion: '情绪',
+      totalLogs: '日志总数',
+      tasksDone: '已完成任务',
+      longTermGoals: '长期目标',
+      growthStreak: '成长连击',
+      activityTrend: '活动趋势 (最近 7 天)',
+      heatmap: '成长热力图',
+      milestones: '战略里程碑',
+      logs: '历史记录',
+      days: '天',
+      showing: '显示第 {start} 至 {end} 项，共 {total} 项',
+      page: '第 {current} 页，共 {total} 页',
+      reframedInsight: '认知重构洞察'
+    },
+    reports: {
+      title: '灵魂画像',
+      subtitle: 'AI 驱动的角色分析与心理洞察。',
+      lastSync: '上次同步: {time}',
+      growthBalance: '成长平衡',
+      aiInsight: 'AI 洞察',
+      coreTraits: '核心人格特质',
+      growthAssetsGained: '已获得的成长资产',
+      weeklySynthesis: '每周成长综合分析',
+      downloadReport: '下载完整报告',
+      shareInsights: '分享洞察',
+      correlation: '情绪与成长指数相关性',
+      traits: {
+        resilience: '韧性',
+        courage: '勇气',
+        selfAwareness: '自我觉察',
+        empathy: '移情',
+        patience: '耐心',
+        physical: '元气',
+        mental: '心流',
+        social: '回响',
+        skill: '火花',
+        master: '大师',
+        expert: '专家',
+        adept: '熟练'
+      }
+    },
+    settings: {
+      title: '偏好设置',
+      subtitle: '自定义你的成长记录体验。',
+      save: '保存修改',
+      success: '设置已成功保存。',
+      appearance: '外观',
+      theme: '主题偏好',
+      light: '浅色',
+      dark: '深色',
+      language: '语言',
+      aiPersonality: 'AI 人格',
+      mentorStyle: '导师风格',
+      empathetic: '共情 (温暖)',
+      strict: '严肃 (冷静)',
+      philosophical: '哲学 (深邃)',
+      notifications: '通知',
+      dailyReminders: '每日提醒',
+      privacy: '隐私与数据',
+      dataProcessing: 'AI 数据处理',
+      export: '导出数据',
+      clearAll: '清除所有记录',
+      clearConfirm: '你确定要清除所有本地数据吗？此操作不可撤销。'
+    },
+    chat: {
+      title: '连续心理疏导',
+      placeholder: '我还是觉得很难受...',
+      send: '发送',
+      typing: 'AI 正在思考...',
+      welcome: '欢迎来到智聊室。我是你的个人成长导师。今天感觉怎么样？我可以帮你分析进度，或者倾听你的心声。',
+      mentorOnline: 'AI 导师在线',
+      clearHistory: '清除当前对话',
+      history: '往日智慧',
+      newChat: '开启新内省',
+      noHistory: '尚无对话记录。开启新对话来记录你的成长智慧。',
+      sessionTitle: '内省会话',
+      deleteConfirm: '确定要删除这段对话记忆吗？',
+      systemAction: '系统动作',
+      taskAdded: '新任务已添加到你的看板: "{title}"',
+      error: '抱歉，我现在无法连接到智慧核心。但我依然陪在你身边。'
+    },
+    placeholder: {
+      title: '功能开发中',
+      desc: '此功能正在开发中。后端的 API 接口已准备就绪，敬请期待。'
+    }
+  }
+};
+
+export const i18n = createI18n({
+  legacy: false,
+  locale: 'en',
+  fallbackLocale: 'en',
+  messages,
+});

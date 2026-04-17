@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库服务
+  db:
+    image: postgres:15-alpine
+    container_name: seichou_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: seichou_logos
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Spring Boot 后端服务
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: seichou_backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/seichou_logos
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+      # 从宿主机的环境变量中读取 DeepSeek API Key
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY} 
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  # 命名卷，用于持久化数据库数据
+  postgres_data:
