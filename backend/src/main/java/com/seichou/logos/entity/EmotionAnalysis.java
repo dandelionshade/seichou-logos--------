@@ -1,10 +1,13 @@
 package com.seichou.logos.entity;
 
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -19,10 +22,6 @@ import java.util.UUID;
  */
 @Entity // 标记这是一个 JPA 实体类
 @Table(name = "emotion_analysis") // 指定映射的数据库表名为 emotion_analysis
-@Data // Lombok 注解，自动生成 getter/setter 等
-@Builder // Lombok 注解，提供建造者模式
-@NoArgsConstructor // Lombok 注解，生成无参构造函数
-@AllArgsConstructor // Lombok 注解，生成全参构造函数
 public class EmotionAnalysis {
 
     @Id // 标记为主键
@@ -60,4 +59,54 @@ public class EmotionAnalysis {
     @CreationTimestamp // 自动填充创建时间
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    public EmotionAnalysis() {
+    }
+
+    public EmotionAnalysis(UUID analysisId, DailyLog dailyLog, String primaryEmotion, String reframedInsight, Map<String, Object> growthAssets, Map<String, Object> aiInsightDetails, LocalDateTime createdAt) {
+        this.analysisId = analysisId;
+        this.dailyLog = dailyLog;
+        this.primaryEmotion = primaryEmotion;
+        this.reframedInsight = reframedInsight;
+        this.growthAssets = growthAssets;
+        this.aiInsightDetails = aiInsightDetails;
+        this.createdAt = createdAt;
+    }
+
+    public static EmotionAnalysisBuilder builder() { return new EmotionAnalysisBuilder(); }
+
+    public UUID getAnalysisId() { return analysisId; }
+    public void setAnalysisId(UUID analysisId) { this.analysisId = analysisId; }
+    public DailyLog getDailyLog() { return dailyLog; }
+    public void setDailyLog(DailyLog dailyLog) { this.dailyLog = dailyLog; }
+    public String getPrimaryEmotion() { return primaryEmotion; }
+    public void setPrimaryEmotion(String primaryEmotion) { this.primaryEmotion = primaryEmotion; }
+    public String getReframedInsight() { return reframedInsight; }
+    public void setReframedInsight(String reframedInsight) { this.reframedInsight = reframedInsight; }
+    public Map<String, Object> getGrowthAssets() { return growthAssets; }
+    public void setGrowthAssets(Map<String, Object> growthAssets) { this.growthAssets = growthAssets; }
+    public Map<String, Object> getAiInsightDetails() { return aiInsightDetails; }
+    public void setAiInsightDetails(Map<String, Object> aiInsightDetails) { this.aiInsightDetails = aiInsightDetails; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public static class EmotionAnalysisBuilder {
+        private UUID analysisId;
+        private DailyLog dailyLog;
+        private String primaryEmotion;
+        private String reframedInsight;
+        private Map<String, Object> growthAssets;
+        private Map<String, Object> aiInsightDetails;
+        private LocalDateTime createdAt;
+
+        public EmotionAnalysisBuilder analysisId(UUID analysisId) { this.analysisId = analysisId; return this; }
+        public EmotionAnalysisBuilder dailyLog(DailyLog dailyLog) { this.dailyLog = dailyLog; return this; }
+        public EmotionAnalysisBuilder primaryEmotion(String primaryEmotion) { this.primaryEmotion = primaryEmotion; return this; }
+        public EmotionAnalysisBuilder reframedInsight(String reframedInsight) { this.reframedInsight = reframedInsight; return this; }
+        public EmotionAnalysisBuilder growthAssets(Map<String, Object> growthAssets) { this.growthAssets = growthAssets; return this; }
+        public EmotionAnalysisBuilder aiInsightDetails(Map<String, Object> aiInsightDetails) { this.aiInsightDetails = aiInsightDetails; return this; }
+        public EmotionAnalysisBuilder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
+
+        public EmotionAnalysis build() { return new EmotionAnalysis(analysisId, dailyLog, primaryEmotion, reframedInsight, growthAssets, aiInsightDetails, createdAt); }
+    }
 }

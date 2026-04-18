@@ -1,18 +1,26 @@
 package com.seichou.logos.entity;
 
 import jakarta.persistence.Embeddable;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
 @Embeddable
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class Checkpoint {
     private String id;
     private String title;
     private boolean completed;
+
+    public Checkpoint() {
+    }
+
+    public Checkpoint(String id, String title, boolean completed) {
+        this.id = id;
+        this.title = title;
+        this.completed = completed;
+    }
+
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+    public boolean isCompleted() { return completed; }
+    public void setCompleted(boolean completed) { this.completed = completed; }
 }

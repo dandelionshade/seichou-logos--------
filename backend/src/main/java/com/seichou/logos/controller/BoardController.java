@@ -7,22 +7,25 @@ import com.seichou.logos.repository.BoardCardRepository;
 import com.seichou.logos.repository.UserStatsRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/board")
-@RequiredArgsConstructor
 @Tag(name = "Board Controller", description = "Kanban Board & User Stats API")
 public class BoardController {
 
     private final BoardCardRepository boardCardRepository;
     private final UserStatsRepository userStatsRepository;
+
+    public BoardController(BoardCardRepository boardCardRepository, UserStatsRepository userStatsRepository) {
+        this.boardCardRepository = boardCardRepository;
+        this.userStatsRepository = userStatsRepository;
+    }
 
     @GetMapping("/cards")
     @Operation(summary = "Get all board cards for current user")
@@ -36,7 +39,6 @@ public class BoardController {
             @org.springframework.security.core.annotation.AuthenticationPrincipal User user,
             @RequestBody BoardCard card) {
         card.setUser(user);
-        card.setStatus("todo");
         return ResponseEntity.ok(boardCardRepository.save(card));
     }
 
@@ -66,53 +68,34 @@ public class BoardController {
     @GetMapping("/stats")
     @Operation(summary = "Get user stats (level, exp)")
     public ResponseEntity<UserStats> getUserStats(@org.springframework.security.core.annotation.AuthenticationPrincipal User user) {
-        return userStatsRepository.findByUser_UserId(user.getUserId())
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return ResponseEntity.ok(getOrCreateStats(user));
     }
 
-    @PostMapping("/settle")
-    @Operation(summary = "Settle EXP from done cards")
-    @org.springframework.transaction.annotation.Transactional
-    public ResponseEntity<Map<String, Object>> settleExp(
-            @org.springframework.security.core.annotation.AuthenticationPrincipal User user,
-            @RequestBody Map<String, Object> request) {
-        
-        // 1. Get all 'done' cards for this user
-        List<BoardCard> doneCards = boardCardRepository.findByUser_UserIdAndStatus(user.getUserId(), "done");
-        
-        if (doneCards.isEmpty()) {
-            return ResponseEntity.ok(Map.of(
-                "physical_exp", 0,
-                "mental_exp", 0,
-                "compassionate_summary", "No completed tasks to settle today. Every small step counts!"
-            ));
+    public UserStats getOrCreateStats(User user) {
+        Optional<UserStats> existing = userStatsRepository.findByUser_UserId(user.getUserId());
+        if (existing.isPresent()) {
+            UserStats stats = existing.get();
+            if (stats.getVitalityExp() == null) stats.setVitalityExp(0);
+            if (stats.getFlowExp() == null) stats.setFlowExp(0);
+            if (stats.getSparkExp() == null) stats.setSparkExp(0);
+            if (stats.getEchoExp() == null) stats.setEchoExp(0);
+            if (stats.getResilienceExp() == null) stats.setResilienceExp(0);
+            if (stats.getMaxExp() == null) stats.setMaxExp(100);
+            if (stats.getLevel() == null) stats.setLevel(1);
+            if (stats.getUnlockedBadgesRaw() == null) stats.setUnlockedBadgesRaw("");
+            return userStatsRepository.save(stats);
         }
 
-        // 2. Calculate EXP (Simple logic for now: 10 EXP per card)
-        int physicalExpGain = (int) doneCards.stream().filter(c -> "physical".equals(c.getDimension())).count() * 10;
-        int mentalExpGain = (int) doneCards.stream().filter(c -> "mental".equals(c.getDimension())).count() * 10;
-
-        // 3. Update UserStats
-        UserStats stats = userStatsRepository.findByUser_UserId(user.getUserId()).orElseThrow();
-        stats.setPhysicalExp(stats.getPhysicalExp() + physicalExpGain);
-        stats.setMentalExp(stats.getMentalExp() + mentalExpGain);
-
-        // Level up logic
-        int totalExp = stats.getPhysicalExp() + stats.getMentalExp();
-        if (totalExp >= stats.getMaxExp()) {
-            stats.setLevel(stats.getLevel() + 1);
-            stats.setMaxExp((int) (stats.getMaxExp() * 1.5));
-        }
-        userStatsRepository.save(stats);
-
-        // 4. Delete settled cards (or mark as settled/archived)
-        boardCardRepository.deleteAll(doneCards);
-
-        return ResponseEntity.ok(Map.of(
-                "physical_exp", physicalExpGain,
-                "mental_exp", mentalExpGain,
-                "compassionate_summary", "You've made significant progress! Your efforts are being woven into the tapestry of your growth."
-        ));
+        UserStats stats = UserStats.builder()
+                .user(user)
+                .level(1)
+                .vitalityExp(0)
+                .flowExp(0)
+                .sparkExp(0)
+                .echoExp(0)
+                .resilienceExp(0)
+                .maxExp(100)
+                .build();
+        return userStatsRepository.save(stats);
     }
 }

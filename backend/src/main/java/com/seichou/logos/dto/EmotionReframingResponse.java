@@ -1,8 +1,6 @@
 package com.seichou.logos.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Builder;
-import lombok.Data;
 
 import java.util.Map;
 import java.util.UUID;
@@ -12,8 +10,6 @@ import java.util.UUID;
  * Data Transfer Object (数据传输对象)，用于封装后端返回给前端的 API 响应数据。
  * 这样做可以隐藏内部的数据库实体结构，只暴露前端需要的数据。
  */
-@Data // Lombok 注解，自动生成 getter/setter 等
-@Builder // Lombok 注解，提供建造者模式
 @Schema(description = "AI 情绪重构分析结果响应对象") // Swagger 注解，用于生成 API 文档说明
 public class EmotionReframingResponse {
 
@@ -31,4 +27,26 @@ public class EmotionReframingResponse {
 
     @Schema(description = "AI 提供的详细洞察（包括真实需求和行动建议）")
     private Map<String, Object> aiInsightDetails;
+
+    public EmotionReframingResponse() {
+    }
+
+    public EmotionReframingResponse(UUID analysisId, String primaryEmotion, String reframedInsight, Map<String, Object> growthAssets, Map<String, Object> aiInsightDetails) {
+        this.analysisId = analysisId;
+        this.primaryEmotion = primaryEmotion;
+        this.reframedInsight = reframedInsight;
+        this.growthAssets = growthAssets;
+        this.aiInsightDetails = aiInsightDetails;
+    }
+
+    public UUID getAnalysisId() { return analysisId; }
+    public void setAnalysisId(UUID analysisId) { this.analysisId = analysisId; }
+    public String getPrimaryEmotion() { return primaryEmotion; }
+    public void setPrimaryEmotion(String primaryEmotion) { this.primaryEmotion = primaryEmotion; }
+    public String getReframedInsight() { return reframedInsight; }
+    public void setReframedInsight(String reframedInsight) { this.reframedInsight = reframedInsight; }
+    public Map<String, Object> getGrowthAssets() { return growthAssets; }
+    public void setGrowthAssets(Map<String, Object> growthAssets) { this.growthAssets = growthAssets; }
+    public Map<String, Object> getAiInsightDetails() { return aiInsightDetails; }
+    public void setAiInsightDetails(Map<String, Object> aiInsightDetails) { this.aiInsightDetails = aiInsightDetails; }
 }

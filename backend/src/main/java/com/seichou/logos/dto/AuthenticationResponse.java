@@ -1,14 +1,19 @@
 package com.seichou.logos.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data
-@Builder
-@AllArgsConstructor
-@NoArgsConstructor
 public class AuthenticationResponse {
     private String token;
+    private AuthUserDto user;
+
+    public AuthenticationResponse() {
+    }
+
+    public AuthenticationResponse(String token, AuthUserDto user) {
+        this.token = token;
+        this.user = user;
+    }
+
+    public String getToken() { return token; }
+    public void setToken(String token) { this.token = token; }
+    public AuthUserDto getUser() { return user; }
+    public void setUser(AuthUserDto user) { this.user = user; }
 }

@@ -3,30 +3,36 @@ package com.seichou.logos.service;
 import com.seichou.logos.entity.User;
 import com.seichou.logos.entity.UserPreferences;
 import com.seichou.logos.repository.UserPreferencesRepository;
-import lombok.RequiredArgsConstructor;
+import com.seichou.logos.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class UserPreferenceService {
 
     private final UserPreferencesRepository repository;
+    private final UserRepository userRepository;
+
+    public UserPreferenceService(UserPreferencesRepository repository, UserRepository userRepository) {
+        this.repository = repository;
+        this.userRepository = userRepository;
+    }
 
     public UserPreferences getPreferences(UUID userId) {
         return repository.findById(userId)
                 .orElseGet(() -> {
-                    // This should ideally not happen if initialized on registration
-                    return UserPreferences.builder()
-                            .userId(userId)
-                            .theme("dark")
-                            .language("en")
-                            .aiPersonality("empathetic")
-                            .notificationsEnabled(true)
-                            .dataPrivacy("standard")
-                            .build();
+                User user = userRepository.findById(userId).orElseThrow();
+                UserPreferences created = new UserPreferences();
+                created.setUser(user);
+                created.setUserId(userId);
+                created.setTheme("dark");
+                created.setLanguage("en");
+                created.setAiPersonality("empathetic");
+                created.setNotificationsEnabled(true);
+                created.setDataPrivacy("standard");
+                return repository.save(created);
                 });
     }
 

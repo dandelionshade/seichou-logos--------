@@ -2,15 +2,15 @@ package com.seichou.logos.controller;
 
 import com.seichou.logos.dto.EmotionReframingResponse;
 import com.seichou.logos.entity.DailyLog;
+import com.seichou.logos.entity.User;
 import com.seichou.logos.service.EmotionReframingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * LogController (日志控制器)
@@ -18,12 +18,16 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api")
-@RequiredArgsConstructor
 @Tag(name = "Daily Log Controller", description = "日常记录与情绪重构 API")
 public class LogController {
 
     private final EmotionReframingService reframingService;
     private final com.seichou.logos.repository.DailyLogRepository dailyLogRepository;
+
+    public LogController(EmotionReframingService reframingService, com.seichou.logos.repository.DailyLogRepository dailyLogRepository) {
+        this.reframingService = reframingService;
+        this.dailyLogRepository = dailyLogRepository;
+    }
 
     /**
      * 提交日志并进行 AI 情绪重构的接口

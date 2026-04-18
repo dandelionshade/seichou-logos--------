@@ -1,10 +1,14 @@
 package com.seichou.logos.entity;
 
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
@@ -16,10 +20,6 @@ import java.util.UUID;
  */
 @Entity // 标记这是一个 JPA 实体类，将被映射到数据库表
 @Table(name = "daily_logs") // 指定映射的数据库表名为 daily_logs
-@Data // Lombok 注解，自动生成 getter, setter, toString, equals, hashCode 方法
-@Builder // Lombok 注解，提供建造者模式 (Builder Pattern) 来方便地创建对象实例
-@NoArgsConstructor // Lombok 注解，生成无参构造函数 (JPA 规范要求)
-@AllArgsConstructor // Lombok 注解，生成包含所有属性的构造函数
 public class DailyLog {
 
     @Id // 标记此属性为主键
@@ -45,4 +45,54 @@ public class DailyLog {
 
     @OneToOne(mappedBy = "dailyLog", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private EmotionAnalysis emotionAnalysis;
+
+    public DailyLog() {
+    }
+
+    public DailyLog(UUID logId, UUID userId, String content, Integer moodScore, java.time.LocalDate logDate, LocalDateTime createdAt, EmotionAnalysis emotionAnalysis) {
+        this.logId = logId;
+        this.userId = userId;
+        this.content = content;
+        this.moodScore = moodScore;
+        this.logDate = logDate;
+        this.createdAt = createdAt;
+        this.emotionAnalysis = emotionAnalysis;
+    }
+
+    public static DailyLogBuilder builder() { return new DailyLogBuilder(); }
+
+    public UUID getLogId() { return logId; }
+    public void setLogId(UUID logId) { this.logId = logId; }
+    public UUID getUserId() { return userId; }
+    public void setUserId(UUID userId) { this.userId = userId; }
+    public String getContent() { return content; }
+    public void setContent(String content) { this.content = content; }
+    public Integer getMoodScore() { return moodScore; }
+    public void setMoodScore(Integer moodScore) { this.moodScore = moodScore; }
+    public java.time.LocalDate getLogDate() { return logDate; }
+    public void setLogDate(java.time.LocalDate logDate) { this.logDate = logDate; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public EmotionAnalysis getEmotionAnalysis() { return emotionAnalysis; }
+    public void setEmotionAnalysis(EmotionAnalysis emotionAnalysis) { this.emotionAnalysis = emotionAnalysis; }
+
+    public static class DailyLogBuilder {
+        private UUID logId;
+        private UUID userId;
+        private String content;
+        private Integer moodScore;
+        private java.time.LocalDate logDate;
+        private LocalDateTime createdAt;
+        private EmotionAnalysis emotionAnalysis;
+
+        public DailyLogBuilder logId(UUID logId) { this.logId = logId; return this; }
+        public DailyLogBuilder userId(UUID userId) { this.userId = userId; return this; }
+        public DailyLogBuilder content(String content) { this.content = content; return this; }
+        public DailyLogBuilder moodScore(Integer moodScore) { this.moodScore = moodScore; return this; }
+        public DailyLogBuilder logDate(java.time.LocalDate logDate) { this.logDate = logDate; return this; }
+        public DailyLogBuilder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
+        public DailyLogBuilder emotionAnalysis(EmotionAnalysis emotionAnalysis) { this.emotionAnalysis = emotionAnalysis; return this; }
+
+        public DailyLog build() { return new DailyLog(logId, userId, content, moodScore, logDate, createdAt, emotionAnalysis); }
+    }
 }
