@@ -1,6 +1,7 @@
 import express from "express"; // 引入 Express 框架
 import { createServer as createViteServer } from "vite"; // 引入 Vite
 import path from "path";
+import fs from "fs";
 import dotenv from "dotenv";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 
@@ -73,29 +74,7 @@ async function startServer() {
   // 0. 模拟数据库 (仅用于 AI Studio 预览环境)
   // 当临时服务重启时，这些内存数据会被清空。为此我们添加一个默认账号应对。
   // ==========================================
-  const mockUsers: any[] = [
-    { id: 'admin-1', email: 'admin@seichou.com', password: 'password123', role: 'ADMIN', name: '先行者', bio: '正在测试全新成长引擎' }
-  ];
-  const mockCards: any[] = [
-    { id: '1', title: '完成一次5公里晨跑', description: '保持配速在6分钟内', category: 'health', tags: ['健康', '微习惯'], status: 'todo' },
-    { id: '2', title: '搞砸了今天的汇报，很自责', description: 'PPT有一页数据写错了，被老板指出来了。', category: 'career', tags: ['挫折', '工作'], status: 'todo' },
-    { id: '3', title: '掌握一门新的外语', description: '长期目标：达到日常交流无障碍。', category: 'career', tags: ['技能', '长期'], status: 'todo', checkpoints: [
-      { id: 'c1', title: '完成基础语法学习', completed: true },
-      { id: 'c2', title: '背诵 1000 个核心词汇', completed: false },
-      { id: 'c3', title: '进行第一次外教口语练习', completed: false }
-    ], progress: 33 },
-  ];
-  const mockStats = { 
-    level: 1, 
-    vitalityExp: 45, // Health
-    flowExp: 80,     // Mind
-    sparkExp: 30,    // Career
-    echoExp: 20,     // Social
-    resilienceExp: 10,
-    maxExp: 100,
-    epiphanyMultiplier: 1.0,
-    unlockedBadges: ['early_bird', 'resilience_init'] as string[]
-  };
+  // Persisted preview state is initialized below.
   type MockPreferences = {
     theme: string;
     language: string;
@@ -104,6 +83,20 @@ async function startServer() {
     dataPrivacy: string;
     deepseekApiKeyCiphertext?: string;
   };
+  type PersistedPreviewState = {
+    users: any[];
+    cards: any[];
+    stats: any;
+    preferences: Record<string, MockPreferences>;
+    logs: any[];
+  };
+
+  const configuredDataDir = (process.env.PREVIEW_DATA_DIR || '.data').trim() || '.data';
+  const DATA_DIR = path.isAbsolute(configuredDataDir)
+    ? configuredDataDir
+    : path.resolve(process.cwd(), configuredDataDir);
+  const DATA_FILE = path.join(DATA_DIR, 'preview-db.json');
+
   const createDefaultPreferences = (): MockPreferences => ({
     theme: 'dark',
     language: 'en',
@@ -112,12 +105,97 @@ async function startServer() {
     dataPrivacy: 'standard',
     deepseekApiKeyCiphertext: ''
   });
-  const userPreferences = new Map<string, MockPreferences>();
-  userPreferences.set('admin-1', {
-    ...createDefaultPreferences(),
-    deepseekApiKeyCiphertext: process.env.DEEPSEEK_API_KEY ? encryptApiKey(process.env.DEEPSEEK_API_KEY) : ''
+
+  const createInitialPreviewState = (): PersistedPreviewState => ({
+    users: [
+      { id: 'admin-1', email: 'admin@seichou.com', password: 'password123', role: 'ADMIN', name: '先行者', bio: '正在测试全新成长引擎' }
+    ],
+    cards: [
+      { id: '1', title: '完成一次5公里晨跑', description: '保持配速在6分钟内', category: 'health', tags: ['健康', '微习惯'], status: 'todo' },
+      { id: '2', title: '搞砸了今天的汇报，很自责', description: 'PPT有一页数据写错了，被老板指出来了。', category: 'career', tags: ['挫折', '工作'], status: 'todo' },
+      { id: '3', title: '掌握一门新的外语', description: '长期目标：达到日常交流无障碍。', category: 'career', tags: ['技能', '长期'], status: 'todo', checkpoints: [
+        { id: 'c1', title: '完成基础语法学习', completed: true },
+        { id: 'c2', title: '背诵 1000 个核心词汇', completed: false },
+        { id: 'c3', title: '进行第一次外教口语练习', completed: false }
+      ], progress: 33 },
+    ],
+    stats: {
+      level: 1,
+      vitalityExp: 45,
+      flowExp: 80,
+      sparkExp: 30,
+      echoExp: 20,
+      resilienceExp: 10,
+      maxExp: 100,
+      epiphanyMultiplier: 1.0,
+      unlockedBadges: ['early_bird', 'resilience_init'] as string[]
+    },
+    preferences: {
+      'admin-1': {
+        ...createDefaultPreferences(),
+        deepseekApiKeyCiphertext: process.env.DEEPSEEK_API_KEY ? encryptApiKey(process.env.DEEPSEEK_API_KEY) : ''
+      }
+    },
+    logs: [],
   });
-  const mockLogs: any[] = [];
+
+  const loadPreviewState = (): PersistedPreviewState => {
+    try {
+      if (!fs.existsSync(DATA_FILE)) {
+        return createInitialPreviewState();
+      }
+      const raw = fs.readFileSync(DATA_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') {
+        return createInitialPreviewState();
+      }
+      return {
+        users: Array.isArray(parsed.users) ? parsed.users : [],
+        cards: Array.isArray(parsed.cards) ? parsed.cards : [],
+        stats: parsed.stats && typeof parsed.stats === 'object' ? parsed.stats : createInitialPreviewState().stats,
+        preferences: parsed.preferences && typeof parsed.preferences === 'object' ? parsed.preferences : {},
+        logs: Array.isArray(parsed.logs) ? parsed.logs : [],
+      };
+    } catch {
+      return createInitialPreviewState();
+    }
+  };
+
+  const persistedState = loadPreviewState();
+  const mockUsers: any[] = persistedState.users.length > 0 ? persistedState.users : createInitialPreviewState().users;
+  const mockCards: any[] = persistedState.cards;
+  const mockStats = persistedState.stats;
+  const userPreferences = new Map<string, MockPreferences>(Object.entries(persistedState.preferences));
+  const mockLogs: any[] = persistedState.logs;
+
+  if (!userPreferences.has('admin-1')) {
+    userPreferences.set('admin-1', {
+      ...createDefaultPreferences(),
+      deepseekApiKeyCiphertext: process.env.DEEPSEEK_API_KEY ? encryptApiKey(process.env.DEEPSEEK_API_KEY) : ''
+    });
+  }
+
+  const savePreviewState = () => {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      const snapshot: PersistedPreviewState = {
+        users: mockUsers,
+        cards: mockCards,
+        stats: mockStats,
+        preferences: Object.fromEntries(userPreferences.entries()),
+        logs: mockLogs,
+      };
+      fs.writeFileSync(DATA_FILE, JSON.stringify(snapshot, null, 2), 'utf8');
+    } catch (e) {
+      console.error('[Server] 保存预览数据失败:', e);
+    }
+  };
+
+  // Ensure there is always a baseline snapshot for next restart.
+  savePreviewState();
+  console.log(`[Server] Preview data dir: ${DATA_DIR}`);
 
   const resolveUserIdFromAuthHeader = (authorization?: string) => {
     if (!authorization || !authorization.startsWith('Bearer ')) return null;
@@ -129,6 +207,7 @@ async function startServer() {
   const getOrCreatePreferences = (userId: string) => {
     if (!userPreferences.has(userId)) {
       userPreferences.set(userId, createDefaultPreferences());
+      savePreviewState();
     }
     return userPreferences.get(userId)!;
   };
@@ -162,7 +241,8 @@ async function startServer() {
     
     mockUsers.push(newUser);
     userPreferences.set(newUser.id, createDefaultPreferences());
-    
+    savePreviewState();
+
     const mockToken = `mock-jwt-token-${newUser.id}`;
     
     res.json({
@@ -202,6 +282,7 @@ async function startServer() {
   apiRouter.post("/board/cards", (req, res) => {
     const card = { ...req.body, id: Date.now().toString(), status: 'todo' };
     mockCards.push(card);
+    savePreviewState();
     res.json(card);
   });
 
@@ -210,7 +291,20 @@ async function startServer() {
     const index = mockCards.findIndex(c => c.id === id);
     if (index !== -1) {
       mockCards[index] = { ...mockCards[index], ...req.body };
+      savePreviewState();
       res.json(mockCards[index]);
+    } else {
+      res.status(404).json({ error: "Card not found" });
+    }
+  });
+
+  apiRouter.delete("/board/cards/:id", (req, res) => {
+    const { id } = req.params;
+    const index = mockCards.findIndex(c => c.id === id);
+    if (index !== -1) {
+      mockCards.splice(index, 1);
+      savePreviewState();
+      res.status(204).send();
     } else {
       res.status(404).json({ error: "Card not found" });
     }
@@ -252,6 +346,8 @@ async function startServer() {
     if (typeof req.body.deepseekApiKey === 'string') {
       prefs.deepseekApiKeyCiphertext = encryptApiKey(req.body.deepseekApiKey);
     }
+
+    savePreviewState();
 
     res.json({
       theme: prefs.theme,
@@ -307,7 +403,8 @@ async function startServer() {
     
     const { name, bio } = req.body;
     mockUsers[userIndex] = { ...mockUsers[userIndex], name, bio };
-    
+    savePreviewState();
+
     res.json({
       id: mockUsers[userIndex].id,
       email: mockUsers[userIndex].email,
@@ -342,7 +439,8 @@ async function startServer() {
     }
     
     mockUsers[userIndex].password = newPassword;
-    
+    savePreviewState();
+
     res.json({ message: "Password updated successfully" });
   });
 
@@ -379,6 +477,7 @@ async function startServer() {
           emotionAnalysis: fallbackResult
         };
         mockLogs.unshift(newLog);
+        savePreviewState();
 
         return res.json(fallbackResult);
       }
@@ -451,6 +550,7 @@ async function startServer() {
         emotionAnalysis: resultJson
       };
       mockLogs.unshift(newLog);
+      savePreviewState();
 
       res.json(resultJson);
     } catch (error: any) {
@@ -624,7 +724,8 @@ async function startServer() {
         mockStats.sparkExp += mockResult.spark_exp;
         mockStats.echoExp += mockResult.echo_exp;
         mockStats.resilienceExp += mockResult.resilience_exp;
-        
+        savePreviewState();
+
         const newBadges = checkAndUnlockBadges(mockResult.resilience_exp, cards);
         
         return res.json({ ...mockResult, newlyUnlockedBadges: newBadges });
@@ -707,6 +808,7 @@ async function startServer() {
       mockStats.sparkExp += finalSpark;
       mockStats.echoExp += finalEcho;
       mockStats.resilienceExp += finalResilience;
+      savePreviewState();
 
       // Re-assign scaled values to return to UI
       resultJson.vitality_exp = finalVitality;
@@ -734,6 +836,7 @@ async function startServer() {
       mockStats.resilienceExp += 10;
       // Increase modifier due to struggle accumulating resilience dividends
       mockStats.epiphanyMultiplier = Math.min(3.0, (mockStats.epiphanyMultiplier || 1.0) + 0.2);
+      savePreviewState();
 
       if (!apiKey || apiKey === "your_deepseek_api_key_here") {
         return res.json({
@@ -858,7 +961,16 @@ async function startServer() {
   // Vite 中间件配置 (开发环境)
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        watch: {
+          // Persisted preview DB writes should not trigger HMR/full reload.
+          ignored: (watchedPath: string) => {
+            const resolvedPath = path.resolve(watchedPath);
+            return resolvedPath === DATA_DIR || resolvedPath.startsWith(`${DATA_DIR}${path.sep}`);
+          },
+        },
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);

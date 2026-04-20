@@ -39,9 +39,76 @@ export interface UserStats {
   unlockedBadges?: string[];   // 解锁的成就徽章集合
 }
 
+export type DeleteRouteStatus = 'available' | 'unavailable' | 'unknown';
+
 // 声明全局响应式状态树：Pinia Store
 // 采用 Composition API (Setup Store) 模式
 export const useBoardStore = defineStore('board', () => {
+  const DELETED_CARD_IDS_KEY = 'deleted_board_card_ids_v1';
+
+  const getDeletedCardIds = (): Set<string> => {
+    try {
+      const raw = localStorage.getItem(DELETED_CARD_IDS_KEY);
+      if (!raw) return new Set();
+      const parsed = JSON.parse(raw);
+      return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+    } catch {
+      return new Set();
+    }
+  };
+
+  const addDeletedCardId = (id: string) => {
+    const deletedIds = getDeletedCardIds();
+    deletedIds.add(id);
+    localStorage.setItem(DELETED_CARD_IDS_KEY, JSON.stringify(Array.from(deletedIds)));
+    deletedCardCount.value = deletedIds.size;
+  };
+
+  const removeDeletedCardId = (id: string) => {
+    const deletedIds = getDeletedCardIds();
+    if (!deletedIds.delete(id)) return;
+    localStorage.setItem(DELETED_CARD_IDS_KEY, JSON.stringify(Array.from(deletedIds)));
+    deletedCardCount.value = deletedIds.size;
+  };
+
+  const applyDeletedCardFilter = (items: BoardCard[]) => {
+    const deletedIds = getDeletedCardIds();
+    if (deletedIds.size === 0) return items;
+    return items.filter(c => !deletedIds.has(String(c.id)));
+  };
+
+  const checkDeleteApiReady = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/board/cards/__delete_route_probe__', {
+        method: 'DELETE',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const contentType = response.headers.get('content-type') || '';
+      const poweredBy = (response.headers.get('x-powered-by') || '').toLowerCase();
+
+      if (response.status === 204 || response.status === 400 || response.status === 401 || response.status === 403) {
+        deleteRouteStatus.value = 'available';
+        return true;
+      }
+
+      if (response.status === 404) {
+        const available = contentType.includes('application/json') || poweredBy.includes('express');
+        deleteRouteStatus.value = available ? 'available' : 'unavailable';
+        return available;
+      }
+
+      deleteRouteStatus.value = 'unavailable';
+      return false;
+    } catch {
+      deleteRouteStatus.value = 'unknown';
+      return false;
+    }
+  };
+
   // === 状态声明 (State) ===
   const cards = ref<BoardCard[]>([]);       // 活跃的卡片列表
   const stats = ref<UserStats>({            // 个人大盘数据初始化
@@ -59,6 +126,8 @@ export const useBoardStore = defineStore('board', () => {
 
   // 历史完成记录 (通常用于查看档案库)
   const completedHistory = ref<BoardCard[]>([]);
+  const deletedCardCount = ref(getDeletedCardIds().size);
+  const deleteRouteStatus = ref<DeleteRouteStatus>('unknown');
 
   // === 派生属性 (Getters) ===
   // 计算连续成长天数 (目前为 Mock，后端实现后可从 Stats 返回)
@@ -73,7 +142,7 @@ export const useBoardStore = defineStore('board', () => {
     loading.value = true;
     try {
       const data = await apiFetch('/board/cards');
-      cards.value = data;
+      cards.value = applyDeletedCardFilter(data);
     } catch (e) {
       console.error('Failed to fetch cards', e);
     } finally {
@@ -97,6 +166,7 @@ export const useBoardStore = defineStore('board', () => {
       method: 'POST',
       body: JSON.stringify(card),
     });
+    removeDeletedCardId(newCard.id);
     cards.value.push(newCard); // 本地响应式推入，前端立刻显示
     return newCard;
   };
@@ -112,6 +182,79 @@ export const useBoardStore = defineStore('board', () => {
     if (index !== -1) {
       cards.value[index] = updatedCard;
     }
+  };
+
+  const deleteCard = async (id: string): Promise<{ persisted: boolean }> => {
+    try {
+      await apiFetch(`/board/cards/${id}`, {
+        method: 'DELETE',
+        silentError: true,
+      });
+      cards.value = cards.value.filter(c => c.id !== id);
+      completedHistory.value = completedHistory.value.filter(c => c.id !== id);
+      removeDeletedCardId(id);
+      deleteRouteStatus.value = 'available';
+      return { persisted: true };
+    } catch (e: any) {
+      const message = String(e?.message || '');
+      const deleteRouteUnavailable = message.includes('404') || message.includes('405');
+
+      if (!deleteRouteUnavailable) {
+        throw e;
+      }
+
+      // Fallback for stale backend processes: hide locally so users can keep working.
+      cards.value = cards.value.filter(c => c.id !== id);
+      completedHistory.value = completedHistory.value.filter(c => c.id !== id);
+      addDeletedCardId(id);
+      deleteRouteStatus.value = 'unavailable';
+      return { persisted: false };
+    }
+  };
+
+  const refreshDeleteRouteHealth = async () => {
+    const apiReady = await checkDeleteApiReady();
+    return {
+      apiReady,
+      status: deleteRouteStatus.value,
+    };
+  };
+
+  const retryPermanentDelete = async () => {
+    const ids = Array.from(getDeletedCardIds());
+    if (ids.length === 0) {
+      return { apiReady: true, removed: 0, remaining: 0 };
+    }
+
+    const apiReady = await checkDeleteApiReady();
+    if (!apiReady) {
+      return { apiReady: false, removed: 0, remaining: ids.length };
+    }
+
+    let removed = 0;
+    for (const id of ids) {
+      try {
+        await apiFetch(`/board/cards/${id}`, {
+          method: 'DELETE',
+          silentError: true,
+        });
+        removed += 1;
+        removeDeletedCardId(id);
+      } catch (e: any) {
+        const message = String(e?.message || '');
+        if (message.includes('404')) {
+          // Route exists but server has no such card anymore -> treat as synced.
+          removed += 1;
+          removeDeletedCardId(id);
+        }
+      }
+    }
+
+    return {
+      apiReady: true,
+      removed,
+      remaining: getDeletedCardIds().size,
+    };
   };
 
   const moveCard = async (id: string, category: Category) => {
@@ -207,10 +350,11 @@ export const useBoardStore = defineStore('board', () => {
   };
 
   const getDoneCards = computed(() => cards.value.filter(c => c.status !== 'todo'));
+  const localOnlyDeleteMode = computed(() => deletedCardCount.value > 0);
 
   return { 
-    cards, stats, completedHistory, streak, loading,
-    fetchCards, fetchStats, addCard, updateCard, moveCard, completeCard, markStruggled, markComposted, toggleCheckpoint, settleExp, triggerLowBattery,
+    cards, stats, completedHistory, streak, loading, deletedCardCount, deleteRouteStatus, localOnlyDeleteMode,
+    fetchCards, fetchStats, addCard, updateCard, deleteCard, retryPermanentDelete, refreshDeleteRouteHealth, moveCard, completeCard, markStruggled, markComposted, toggleCheckpoint, settleExp, triggerLowBattery,
     getCardsByCategory, getDoneCards
   };
 });

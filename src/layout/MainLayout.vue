@@ -5,11 +5,12 @@ import { useRoute, useRouter } from 'vue-router';
 import { useBoardStore } from '../store/boardStore';
 import { usePreferenceStore } from '../store/preferenceStore';
 import { useAuthStore } from '../store/authStore';
+import { useToastStore } from '../store/toastStore';
 import { soundFx } from '../utils/audio';
 import TreeOfLogos from '../components/TreeOfLogos.vue';
 import {
   LayoutDashboard, BookOpen, TrendingUp, Settings,
-  ChevronRight, Globe, User, Bell, Zap, Heart, MessageSquare, Sprout, Milestone, Volume2, VolumeX
+  ChevronRight, Globe, User, Bell, Zap, Heart, MessageSquare, Sprout, Milestone, Volume2, VolumeX, RefreshCw
 } from 'lucide-vue-next';
 
 const { t, locale } = useI18n();
@@ -19,6 +20,111 @@ const goToGarden = () => router.push('/garden');
 const boardStore = useBoardStore();
 const preferenceStore = usePreferenceStore();
 const authStore = useAuthStore();
+const toastStore = useToastStore();
+
+type BackendOrigin = 'node' | 'spring' | 'unknown';
+const BACKEND_ORIGIN_CACHE_KEY = 'backend_origin_indicator_v1';
+const backendOrigin = ref<BackendOrigin>('unknown');
+const showBackendIndicator = computed(() => import.meta.env.DEV);
+
+const backendOriginLabel = computed(() => {
+  if (backendOrigin.value === 'node') return t('header.backendNode');
+  if (backendOrigin.value === 'spring') return t('header.backendSpring');
+  return t('header.backendUnknown');
+});
+
+const backendOriginClass = computed(() => {
+  if (backendOrigin.value === 'node') return 'text-blue-400';
+  if (backendOrigin.value === 'spring') return 'text-green-400';
+  return 'text-ink-dim';
+});
+
+const deleteRouteLabel = computed(() => {
+  if (boardStore.deleteRouteStatus === 'available') return t('header.deleteRouteAvailable');
+  if (boardStore.deleteRouteStatus === 'unavailable') return t('header.deleteRouteUnavailable');
+  return t('header.deleteRouteUnknown');
+});
+
+const deleteRouteClass = computed(() => {
+  if (boardStore.deleteRouteStatus === 'available') return 'text-green-400';
+  if (boardStore.deleteRouteStatus === 'unavailable') return 'text-red-400';
+  return 'text-ink-dim';
+});
+
+const deleteModeLabel = computed(() => {
+  return boardStore.localOnlyDeleteMode
+    ? t('header.deleteModeLocalOnly')
+    : t('header.deleteModeNormal');
+});
+
+const detectBackendOrigin = async () => {
+  if (!import.meta.env.DEV) return;
+
+  const cached = sessionStorage.getItem(BACKEND_ORIGIN_CACHE_KEY);
+  if (cached === 'node' || cached === 'spring' || cached === 'unknown') {
+    backendOrigin.value = cached;
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch('/api/board/cards/__backend_probe__', {
+      method: 'DELETE',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    const poweredBy = (response.headers.get('x-powered-by') || '').toLowerCase();
+
+    if (response.status === 400 || response.status === 401 || response.status === 403) {
+      backendOrigin.value = 'spring';
+    } else if (response.status === 204) {
+      backendOrigin.value = 'node';
+    } else if (response.status === 404) {
+      backendOrigin.value = contentType.includes('application/json') || poweredBy.includes('express')
+        ? 'node'
+        : 'unknown';
+    } else {
+      backendOrigin.value = 'unknown';
+    }
+  } catch {
+    backendOrigin.value = 'unknown';
+  } finally {
+    sessionStorage.setItem(BACKEND_ORIGIN_CACHE_KEY, backendOrigin.value);
+  }
+};
+
+const retryingDeleteSync = ref(false);
+
+const retryPermanentDelete = async () => {
+  if (retryingDeleteSync.value) return;
+  if (boardStore.deletedCardCount <= 0) {
+    toastStore.addToast(t('header.retryDeleteNothing'), 'info');
+    return;
+  }
+
+  retryingDeleteSync.value = true;
+  try {
+    const result = await boardStore.retryPermanentDelete();
+    if (!result.apiReady) {
+      toastStore.addToast(t('header.retryDeleteNeedBackend'), 'warning');
+      return;
+    }
+
+    if (result.removed > 0) {
+      toastStore.addToast(t('header.retryDeleteSuccess', { count: result.removed }), 'success');
+    } else {
+      toastStore.addToast(t('header.retryDeleteNothing'), 'info');
+    }
+  } catch (e) {
+    console.error('Retry permanent delete failed', e);
+    toastStore.addToast(t('header.retryDeleteFailed'), 'error');
+  } finally {
+    retryingDeleteSync.value = false;
+  }
+};
 
 const soundEnabled = ref(true);
 const toggleSound = () => {
@@ -42,7 +148,10 @@ const closeLangMenu = (e: Event) => {
 
 onMounted(async () => {
   document.addEventListener('click', closeLangMenu);
-  
+
+  await detectBackendOrigin();
+  await boardStore.refreshDeleteRouteHealth();
+
   // Fetch all initial data
   if (authStore.isAuthenticated) {
     await Promise.all([
@@ -157,6 +266,45 @@ const resiliencePercent = computed(() => Math.min(100, ((boardStore.stats.resili
 
         <!-- 右侧操作区 (Right) -->
         <div class="flex gap-4 sm:gap-6 text-[10px] uppercase tracking-widest text-ink-dim items-center justify-end">
+          <div
+            v-if="showBackendIndicator"
+            class="hidden lg:flex flex-col gap-1 px-2.5 py-1.5 rounded-lg border border-border/60 bg-card-bg/60 normal-case tracking-normal text-[10px] leading-tight"
+            :title="t('header.deleteHealth')"
+          >
+            <div class="text-ink-dim/80 uppercase tracking-wider text-[9px]">{{ t('header.deleteHealth') }}</div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-ink-dim">{{ t('header.deleteRoute') }}:</span>
+              <span :class="deleteRouteClass">{{ deleteRouteLabel }}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-ink-dim">{{ t('header.deleteMode') }}:</span>
+              <span>{{ deleteModeLabel }}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-ink-dim">{{ t('header.deleteRetryCount') }}:</span>
+              <span class="text-vision">{{ boardStore.deletedCardCount }}</span>
+            </div>
+          </div>
+          <button
+            v-if="showBackendIndicator && boardStore.deletedCardCount > 0"
+            type="button"
+            class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded border border-vision/40 text-vision hover:border-vision hover:bg-vision/10 transition-colors"
+            :disabled="retryingDeleteSync"
+            :title="t('header.retryDeletePermanent', { count: boardStore.deletedCardCount })"
+            @click="retryPermanentDelete"
+          >
+            <RefreshCw :size="12" :class="retryingDeleteSync ? 'animate-spin' : ''" />
+            <span>{{ t('header.retryDeletePermanent', { count: boardStore.deletedCardCount }) }}</span>
+          </button>
+          <span
+            v-if="showBackendIndicator"
+            class="hidden sm:flex items-center gap-1.5"
+            :title="t('header.backendSource')"
+          >
+            <div class="w-1.5 h-1.5 rounded-full" :class="backendOriginClass === 'text-ink-dim' ? 'bg-ink-dim' : (backendOriginClass === 'text-blue-400' ? 'bg-blue-400' : 'bg-green-400')" />
+            <span>{{ t('header.backendSource') }}: </span>
+            <span :class="backendOriginClass">{{ backendOriginLabel }}</span>
+          </span>
           <span class="hidden sm:flex items-center gap-1.5"><div class="w-1.5 h-1.5 rounded-full bg-accent-glow" /> {{ t('header.system') }}</span>
           <span class="hidden sm:inline">{{ t('header.database') }}</span>
           

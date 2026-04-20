@@ -1,23 +1,64 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useBoardStore, type Category, type BoardCard } from '../store/boardStore';
+import { useToastStore } from '../store/toastStore';
 import { soundFx } from '../utils/audio';
 import TreeOfLogos from '../components/TreeOfLogos.vue';
 import { 
   Plus, Zap, Heart, CheckCircle, Loader2, Sparkles, 
   Kanban, List, Minimize2, Maximize2, Check, X,
-  TrendingUp, Milestone, Star, BatteryWarning, Sprout, Award
+  TrendingUp, Milestone, Star, BatteryWarning, Sprout, Award, Pencil, Trash2
 } from 'lucide-vue-next';
 
 const { t } = useI18n();
 const boardStore = useBoardStore();
+const toastStore = useToastStore();
+
+const DELETE_CAPABILITY_CHECK_KEY = 'board_delete_capability_checked_v1';
+
+const checkDeleteApiCapabilityInDev = async () => {
+  if (!import.meta.env.DEV) return;
+  if (sessionStorage.getItem(DELETE_CAPABILITY_CHECK_KEY) === '1') return;
+
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch('/api/board/cards/__delete_capability_probe__', {
+      method: 'DELETE',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    const isLikelyUnsupported = response.status === 404 && contentType.includes('text/html');
+
+    if (isLikelyUnsupported) {
+      toastStore.addToast(t('dashboard.deleteApiUnavailable'), 'warning');
+    }
+  } catch {
+    // Ignore transient probe failures; real operations will still surface concrete errors.
+  } finally {
+    sessionStorage.setItem(DELETE_CAPABILITY_CHECK_KEY, '1');
+  }
+};
 
 onMounted(async () => {
   if (boardStore.cards.length === 0) {
     await boardStore.fetchCards();
   }
   await boardStore.fetchStats();
+  await checkDeleteApiCapabilityInDev();
+
+  window.addEventListener('click', closeCardContextMenu);
+  window.addEventListener('scroll', closeCardContextMenu, true);
+  window.addEventListener('resize', closeCardContextMenu);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('click', closeCardContextMenu);
+  window.removeEventListener('scroll', closeCardContextMenu, true);
+  window.removeEventListener('resize', closeCardContextMenu);
 });
 
 const categories = computed(() => [
@@ -59,6 +100,93 @@ const onDrop = (e: DragEvent, category: Category) => {
   draggedCardId.value = null;
 };
 
+const cardContextMenu = ref<{ visible: boolean; x: number; y: number; cardId: string | null; card: BoardCard | null }>({
+  visible: false,
+  x: 0,
+  y: 0,
+  cardId: null,
+  card: null,
+});
+
+const cardContextMenuStyle = computed(() => {
+  const menuWidth = 176;
+  const menuHeight = 90;
+  const left = Math.min(cardContextMenu.value.x, window.innerWidth - menuWidth - 12);
+  const top = Math.min(cardContextMenu.value.y, window.innerHeight - menuHeight - 12);
+  return {
+    left: `${Math.max(8, left)}px`,
+    top: `${Math.max(8, top)}px`,
+  };
+});
+
+const openCardContextMenu = (event: MouseEvent, card: BoardCard) => {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const targetEl = event.currentTarget as HTMLElement | null;
+  const rect = targetEl?.getBoundingClientRect();
+  const menuWidth = 176;
+  let x = event.clientX;
+  let y = event.clientY;
+
+  if (rect) {
+    const rightSideX = rect.right + 8;
+    const leftSideX = rect.left - menuWidth - 8;
+    const canPlaceRight = rightSideX + menuWidth <= window.innerWidth - 8;
+    x = canPlaceRight ? rightSideX : Math.max(8, leftSideX);
+    y = Math.min(Math.max(8, rect.top + 8), window.innerHeight - 90 - 8);
+  }
+
+  cardContextMenu.value = {
+    visible: true,
+    x,
+    y,
+    cardId: card.id,
+    card,
+  };
+};
+
+const closeCardContextMenu = () => {
+  if (!cardContextMenu.value.visible) return;
+  cardContextMenu.value.visible = false;
+  cardContextMenu.value.cardId = null;
+  cardContextMenu.value.card = null;
+};
+
+const handleContextEdit = (event?: MouseEvent) => {
+  event?.preventDefault();
+  event?.stopPropagation();
+  const card = cardContextMenu.value.card;
+  closeCardContextMenu();
+  if (!card) return;
+  openEditModal(card);
+};
+
+const handleContextDelete = async (event?: MouseEvent) => {
+  event?.preventDefault();
+  event?.stopPropagation();
+  const card = cardContextMenu.value.card;
+  closeCardContextMenu();
+  if (!card) return;
+  if (!window.confirm(t('edit.deleteConfirm'))) return;
+
+  try {
+    const result = await boardStore.deleteCard(card.id);
+    if (editingCardId.value === card.id) {
+      showAddModal.value = false;
+      editingCardId.value = null;
+      selectedExperience.value = null;
+    }
+    toastStore.addToast(
+      result.persisted ? t('edit.deleted') : t('edit.deletedLocalOnly'),
+      result.persisted ? 'success' : 'warning'
+    );
+  } catch (e) {
+    console.error('Failed to delete card', e);
+    toastStore.addToast(t('edit.deleteFailed'), 'error');
+  }
+};
+
 // 完成卡片动画与音效
 const completingCards = ref<Set<string>>(new Set());
 
@@ -86,10 +214,19 @@ const playPopSound = () => {
 
 // 卡片结算弹窗逻辑
 const settlingCardId = ref<string | null>(null);
+type ExperienceStatus = 'done' | 'struggled' | 'composted';
+const selectedExperience = ref<ExperienceStatus | null>(null);
 
-const confirmCardSettle = (status: 'done' | 'struggled' | 'composted') => {
-  if (!settlingCardId.value) return;
-  const id = settlingCardId.value;
+const selectExperience = (status: ExperienceStatus) => {
+  selectedExperience.value = status;
+  soundFx.click();
+};
+
+const confirmCardSettle = (status: 'done' | 'struggled' | 'composted', targetCardId?: string) => {
+  const id = targetCardId || settlingCardId.value || editingCardId.value;
+  if (!id) return;
+
+  settlingCardId.value = id;
   showCardSettleModal.value = false;
   showAddModal.value = false; // Close the unified drawer
   
@@ -100,9 +237,13 @@ const confirmCardSettle = (status: 'done' | 'struggled' | 'composted') => {
     if (status === 'done') boardStore.completeCard(id);
     else if (status === 'struggled') boardStore.markStruggled(id);
     else if (status === 'composted') boardStore.markComposted(id);
-    
+
+    toastStore.addToast(t('dashboard.settledArchived'), 'success');
+
     completingCards.value.delete(id);
-    settlingCardId.value = null;
+    if (settlingCardId.value === id) settlingCardId.value = null;
+    if (editingCardId.value === id) editingCardId.value = null;
+    selectedExperience.value = null;
   }, 400);
 };
 
@@ -126,6 +267,7 @@ const checkpointInput = ref('');
 
 const openAddModal = (category: Category = 'health') => {
   editingCardId.value = null;
+  selectedExperience.value = null;
   newCard.value = { title: '', description: '', category, tags: [], checkpoints: [] };
   tagInput.value = '';
   checkpointInput.value = '';
@@ -135,7 +277,8 @@ const openAddModal = (category: Category = 'health') => {
 const openEditModal = (card: BoardCard) => {
   editingCardId.value = card.id;
   settlingCardId.value = card.id; // Also set for settlement
-  newCard.value = { 
+  selectedExperience.value = null;
+  newCard.value = {
     title: card.title, 
     description: card.description || '', 
     category: card.category, 
@@ -185,7 +328,7 @@ const removeTag = (index: number) => {
   newCard.value.tags.splice(index, 1);
 };
 
-const submitCard = () => {
+const submitCard = async () => {
   if (!newCard.value.title.trim()) return;
   
   const cardData = {
@@ -196,13 +339,24 @@ const submitCard = () => {
     checkpoints: newCard.value.checkpoints
   };
 
-  if (editingCardId.value) {
-    boardStore.updateCard(editingCardId.value, cardData);
-  } else {
-    boardStore.addCard(cardData);
+  try {
+    if (editingCardId.value) {
+      await boardStore.updateCard(editingCardId.value, cardData);
+    } else {
+      await boardStore.addCard(cardData);
+    }
+
+    // Editing flow: user explicitly confirms experience via Save.
+    if (editingCardId.value && selectedExperience.value) {
+      const currentEditingCardId = editingCardId.value;
+      confirmCardSettle(selectedExperience.value, currentEditingCardId);
+      return;
+    }
+
+    showAddModal.value = false;
+  } catch (e) {
+    console.error('Failed to save card', e);
   }
-  
-  showAddModal.value = false;
 };
 
 // 结算逻辑 (AI Settlement)
@@ -456,9 +610,11 @@ const getCategoryColor = (catId: Category) => {
                     draggable="true"
                     @dragstart="onDragStart($event, card.id)"
                     @click="openEditModal(card)"
+                    @contextmenu.prevent="openCardContextMenu($event, card)"
                     class="bg-bg/50 border border-border rounded-xl p-4 cursor-grab active:cursor-grabbing hover:border-accent-glow/40 transition-all group relative overflow-hidden"
                     :class="{ 
                       'opacity-50 grayscale-[0.5]': completingCards.has(card.id),
+                      'ring-1 ring-vision/50 border-vision/60': cardContextMenu.visible && cardContextMenu.cardId === card.id,
                       'ring-1 ring-accent-glow/30 bg-accent-glow/[0.03] shadow-[0_8px_20px_-12px_rgba(136,214,108,0.2)]': card.checkpoints?.length > 0,
                       'border-accent-glow/30': card.checkpoints?.length > 0 && cat.id === 'career'
                     }"
@@ -560,7 +716,9 @@ const getCategoryColor = (catId: Category) => {
           v-for="card in boardStore.getCardsByCategory(cat.id).value" 
           :key="card.id"
           @click="openEditModal(card)"
+          @contextmenu.prevent="openCardContextMenu($event, card)"
           class="flex items-center gap-4 bg-card-bg p-3 rounded-xl border border-border hover:border-accent-glow/50 transition-colors cursor-pointer group relative overflow-hidden"
+          :class="{ 'ring-1 ring-vision/50 border-vision/60': cardContextMenu.visible && cardContextMenu.cardId === card.id }"
         >
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-0.5">
@@ -596,6 +754,28 @@ const getCategoryColor = (catId: Category) => {
           </div>
         </div>
       </div>
+    </div>
+
+    <div
+      v-if="cardContextMenu.visible && cardContextMenu.card"
+      class="fixed z-[80] w-44 bg-card-bg border border-border rounded-xl shadow-2xl p-1.5"
+      :style="cardContextMenuStyle"
+      @click.stop
+    >
+      <button
+        type="button"
+        class="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-ink hover:bg-bg transition-colors"
+        @click.prevent.stop="handleContextEdit"
+      >
+        <Pencil :size="14" /> {{ t('edit.contextEdit') }}
+      </button>
+      <button
+        type="button"
+        class="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
+        @click.prevent.stop="handleContextDelete"
+      >
+        <Trash2 :size="14" /> {{ t('edit.contextDelete') }}
+      </button>
     </div>
 
     <!-- ========================================== -->
@@ -716,8 +896,9 @@ const getCategoryColor = (catId: Category) => {
             <label class="block text-xs text-ink-dim mb-4 uppercase tracking-widest">{{ t('experience.record') }}</label>
             <div class="grid grid-cols-1 gap-3">
               <button 
-                @click="confirmCardSettle('done')" 
+                @click="selectExperience('done')"
                 class="flex items-center justify-between p-4 rounded-xl border border-border bg-bg hover:border-accent-glow hover:bg-accent-glow/5 transition-all group"
+                :class="selectedExperience === 'done' ? 'ring-1 ring-accent-glow border-accent-glow bg-accent-glow/10' : ''"
               >
                 <div class="flex items-center gap-3">
                   <div class="w-8 h-8 rounded-full bg-accent-glow/10 flex items-center justify-center text-accent-glow group-hover:scale-110 transition-transform">
@@ -729,8 +910,9 @@ const getCategoryColor = (catId: Category) => {
               </button>
 
               <button 
-                @click="confirmCardSettle('struggled')" 
+                @click="selectExperience('struggled')"
                 class="flex items-center justify-between p-4 rounded-xl border border-border bg-bg hover:border-blue-400/50 hover:bg-blue-400/5 transition-all group"
+                :class="selectedExperience === 'struggled' ? 'ring-1 ring-blue-400 border-blue-400/60 bg-blue-400/10' : ''"
               >
                 <div class="flex items-center gap-3">
                   <div class="w-8 h-8 rounded-full bg-blue-400/10 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
@@ -742,8 +924,9 @@ const getCategoryColor = (catId: Category) => {
               </button>
 
               <button 
-                @click="confirmCardSettle('composted')" 
+                @click="selectExperience('composted')"
                 class="flex items-center justify-between p-4 rounded-xl border border-border bg-bg hover:border-green-500/50 hover:bg-green-500/5 transition-all group"
+                :class="selectedExperience === 'composted' ? 'ring-1 ring-green-500 border-green-500/60 bg-green-500/10' : ''"
               >
                 <div class="flex items-center gap-3">
                   <div class="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 group-hover:scale-110 transition-transform">
@@ -758,11 +941,18 @@ const getCategoryColor = (catId: Category) => {
         </div>
         
         <!-- 抽屉底部 -->
-        <div class="p-6 border-t border-border bg-card-bg/50 flex justify-end gap-3">
-          <button @click="showAddModal = false" class="px-5 py-2.5 text-sm text-ink-dim hover:text-ink transition-colors">{{ t('edit.cancel') }}</button>
-          <button @click="submitCard" class="px-5 py-2.5 text-sm bg-accent-glow text-bg rounded-lg font-medium hover:bg-accent-glow/90 transition-colors shadow-lg shadow-accent-glow/20">
-            {{ editingCardId ? t('edit.save') : t('edit.addToKanban') }}
-          </button>
+        <div class="p-6 border-t border-border bg-card-bg/50 flex justify-between items-center gap-3">
+          <div v-if="editingCardId && selectedExperience" class="flex items-center gap-2 text-[11px] text-accent-glow">
+            <span class="w-2 h-2 rounded-full bg-accent-glow animate-pulse"></span>
+            <span>{{ t('edit.saveWillEndEvent') }}</span>
+          </div>
+          <div v-else></div>
+          <div class="flex items-center gap-3">
+            <button @click="showAddModal = false" class="px-5 py-2.5 text-sm text-ink-dim hover:text-ink transition-colors">{{ t('edit.cancel') }}</button>
+            <button @click="submitCard" class="px-5 py-2.5 text-sm bg-accent-glow text-bg rounded-lg font-medium hover:bg-accent-glow/90 transition-colors shadow-lg shadow-accent-glow/20">
+              {{ editingCardId ? (selectedExperience ? t('edit.saveAndComplete') : t('edit.save')) : t('edit.addToKanban') }}
+            </button>
+          </div>
         </div>
       </div>
     </div>

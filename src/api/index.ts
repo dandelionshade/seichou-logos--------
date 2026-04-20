@@ -2,19 +2,24 @@ import { useToastStore } from '@/store/toastStore';
 
 const BASE_URL = '/api';
 
-export async function apiFetch(endpoint: string, options: RequestInit = {}) {
+export interface ApiFetchOptions extends RequestInit {
+  silentError?: boolean;
+}
+
+export async function apiFetch(endpoint: string, options: ApiFetchOptions = {}) {
+  const { silentError = false, ...requestOptions } = options;
   const token = localStorage.getItem('token');
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    ...((options.headers as any) || {}),
+    ...((requestOptions.headers as any) || {}),
   };
 
   try {
     const url = `${BASE_URL}${endpoint}`;
-    console.log(`[API] Fetching: ${url}`, options.method || 'GET');
+    console.log(`[API] Fetching: ${url}`, requestOptions.method || 'GET');
     const response = await fetch(url, {
-      ...options,
+      ...requestOptions,
       headers,
     });
 
@@ -23,11 +28,13 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
       const errorMsg = errorData.error || `API Error: ${response.status}`;
       
       // Hook into the toast store
-      const toastStore = useToastStore();
-      if (response.status === 401) {
-        toastStore.addToast("Session expired. Please log in again.", "error");
-      } else {
-        toastStore.addToast(errorMsg, "error");
+      if (!silentError) {
+        const toastStore = useToastStore();
+        if (response.status === 401) {
+          toastStore.addToast("Session expired. Please log in again.", "error");
+        } else {
+          toastStore.addToast(errorMsg, "error");
+        }
       }
       
       throw new Error(errorMsg);

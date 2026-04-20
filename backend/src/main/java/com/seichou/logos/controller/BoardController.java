@@ -65,6 +65,25 @@ public class BoardController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    @DeleteMapping("/cards/{cardId}")
+    @Operation(summary = "Delete a board card")
+    public ResponseEntity<Void> deleteCard(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal User user,
+            @PathVariable UUID cardId) {
+        Optional<BoardCard> cardOptional = boardCardRepository.findById(cardId);
+        if (cardOptional.isEmpty()) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND).build();
+        }
+
+        BoardCard card = cardOptional.get();
+        if (!card.getUser().getUserId().equals(user.getUserId())) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).build();
+        }
+
+        boardCardRepository.delete(card);
+        return ResponseEntity.status(org.springframework.http.HttpStatus.NO_CONTENT).build();
+    }
+
     @GetMapping("/stats")
     @Operation(summary = "Get user stats (level, exp)")
     public ResponseEntity<UserStats> getUserStats(@org.springframework.security.core.annotation.AuthenticationPrincipal User user) {
