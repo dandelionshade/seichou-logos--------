@@ -32,6 +32,7 @@ CREATE TABLE user_preferences (
     ai_personality VARCHAR(30) DEFAULT 'empathetic',
     notifications_enabled BOOLEAN DEFAULT TRUE,
     data_privacy VARCHAR(20) DEFAULT 'standard',
+    deepseek_api_key TEXT,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

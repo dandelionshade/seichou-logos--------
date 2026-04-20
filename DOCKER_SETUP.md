@@ -5,15 +5,20 @@
 在 `backend` 目录下创建一个名为 `Dockerfile` 的文件，内容如下：
 
 ```dockerfile
-# 使用官方的 OpenJDK 17 镜像作为基础镜像
-FROM eclipse-temurin:17-jdk-alpine
+# syntax=docker/dockerfile:1
 
-# 设置工作目录
+# Build 阶段：使用 Java 21 + Maven 编译 Spring Boot
+FROM maven:3.9-eclipse-temurin-21 AS builder
+WORKDIR /app
+COPY pom.xml ./
+COPY src ./src
+RUN mvn -B -DskipTests package
+
+# Runtime 阶段：仅保留运行时镜像
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-# 将 Maven 构建生成的 jar 包复制到容器中
-# 注意：在运行 docker build 之前，你需要先在 backend 目录下运行 `mvn clean package -DskipTests`
-COPY target/seichou-logos-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=builder /app/target/*.jar app.jar
 
 # 暴露 Spring Boot 默认端口
 EXPOSE 8080
@@ -27,7 +32,6 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 在项目根目录下创建一个名为 `docker-compose.yml` 的文件，内容如下：
 
 ```yaml
-version: '3.8'
 
 services:
   # PostgreSQL 数据库服务
@@ -68,6 +72,5 @@ volumes:
 
 ### 使用说明：
 
-1.  **准备 Jar 包**：在本地开发环境中，进入 `backend` 目录，运行 `mvn clean package -DskipTests` 生成 `target/seichou-logos-0.0.1-SNAPSHOT.jar`。
-2.  **启动服务**：回到项目根目录，运行 `docker-compose up -d`。Docker 会自动拉取 PostgreSQL 镜像，构建 Spring Boot 镜像，并启动这两个容器。
-3.  **访问 API**：后端服务将在 `http://localhost:8080` 运行，你可以通过 Swagger UI (`http://localhost:8080/swagger-ui.html`) 测试接口。
+1.  **启动服务**：在项目根目录运行 `docker compose up -d`。Docker 会自动拉取 PostgreSQL 镜像并构建/启动 Spring Boot。
+2.  **访问 API**：后端服务将在 `http://localhost:8080` 运行，你可以通过 Swagger UI (`http://localhost:8080/swagger-ui.html`) 测试接口。

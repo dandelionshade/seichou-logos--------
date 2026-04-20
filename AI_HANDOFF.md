@@ -16,7 +16,7 @@
 
 ### 2. 后端过渡目标 (Backend Migration Target)
 - **当前状态**: 所有 API 请求（如 `/api/cards`、`/api/settle`）被代理到 `server.ts` 中，使用 Node.js + Express 搭配内存数组进行 Mock。
-- **重构目标**: **Java (JDK 17+) + Spring Boot 3.x + Spring Data JPA + PostgreSQL**。
+- **重构目标**: **Java (JDK 21+) + Spring Boot 3.x + Spring Data JPA + PostgreSQL**。
 - **环境预热**: 根目录下已存在 `docker-compose.yml`，定义好了 Postgres 数据库与后端镜像编排，方便一键启动基础设施。
 
 ---

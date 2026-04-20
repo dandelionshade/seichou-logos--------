@@ -33,6 +33,7 @@ public class EmotionReframingService {
 
     private final DailyLogRepository dailyLogRepository;
     private final EmotionAnalysisRepository emotionAnalysisRepository;
+    private final UserPreferenceService userPreferenceService;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
@@ -42,9 +43,16 @@ public class EmotionReframingService {
     @Value("${deepseek.api.key}")
     private String apiKey;
 
-    public EmotionReframingService(DailyLogRepository dailyLogRepository, EmotionAnalysisRepository emotionAnalysisRepository, RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public EmotionReframingService(
+            DailyLogRepository dailyLogRepository,
+            EmotionAnalysisRepository emotionAnalysisRepository,
+            UserPreferenceService userPreferenceService,
+            RestTemplate restTemplate,
+            ObjectMapper objectMapper
+    ) {
         this.dailyLogRepository = dailyLogRepository;
         this.emotionAnalysisRepository = emotionAnalysisRepository;
+        this.userPreferenceService = userPreferenceService;
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
     }
@@ -65,7 +73,7 @@ public class EmotionReframingService {
         // 2. 准备 HTTP 请求头
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(apiKey);
+        headers.setBearerAuth(resolveApiKey(dailyLog.getUserId()));
 
         // 3. 准备请求体 (遵循 DeepSeek Chat API 规范)
         Map<String, Object> requestBody = Map.of(
@@ -151,5 +159,13 @@ public class EmotionReframingService {
                 + "  }\n"
                 + "}\n"
                 + "支持中日双语输出（根据用户输入的语言自动适配）。";
+    }
+
+    private String resolveApiKey(UUID userId) {
+        String userBoundApiKey = userPreferenceService.resolveDeepseekApiKey(userId);
+        if (userBoundApiKey != null && !userBoundApiKey.isBlank()) {
+            return userBoundApiKey;
+        }
+        return apiKey;
     }
 }

@@ -132,6 +132,8 @@ const sendMessage = async () => {
   
   scrollToBottom();
   isTyping.value = true;
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 25000);
 
   try {
     const history = messages.value
@@ -152,8 +154,12 @@ const sendMessage = async () => {
 
     const response = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {})
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
         messages: history,
         userContext,
         therapyMode: 'adlerian' 
@@ -171,8 +177,8 @@ const sendMessage = async () => {
 
       if (data.action && data.action.type === 'CREATE_TASK') {
         const taskData = data.action.data;
-        const dimension = taskData.dimension || 'health';
-        
+        const dimension = taskData.dimension || taskData.category || 'health';
+
         boardStore.addCard({
           title: taskData.title,
           description: taskData.description,
@@ -194,12 +200,16 @@ const sendMessage = async () => {
       throw new Error('Failed to get AI response');
     }
   } catch (error) {
+    const isTimeout = error instanceof DOMException && error.name === 'AbortError';
     chatStore.addMessageToActiveSession({
       id: Date.now() + 1,
       role: 'assistant',
-      content: t('chat.error')
+      content: isTimeout
+        ? '请求有点慢，我先接住你这句话。你可以继续输入下一句，或者稍后再试。'
+        : t('chat.error')
     });
   } finally {
+    window.clearTimeout(timeoutId);
     isTyping.value = false;
     scrollToBottom();
   }
@@ -455,7 +465,6 @@ const sendMessage = async () => {
             type="text" 
             :placeholder="t('chat.placeholder')"
             class="relative flex-1 bg-card-bg/80 border border-border rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-accent-glow focus:border-accent-glow outline-none transition-all pr-12"
-            :disabled="isTyping"
           />
           <button 
             type="submit"

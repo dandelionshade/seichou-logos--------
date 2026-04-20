@@ -40,6 +40,9 @@ public class UserPreferences {
     @Column(name = "data_privacy", length = 20)
     private String dataPrivacy = "standard";
 
+    @Column(name = "deepseek_api_key", columnDefinition = "TEXT")
+    private String deepseekApiKey;
+
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
@@ -47,7 +50,7 @@ public class UserPreferences {
     public UserPreferences() {
     }
 
-    public UserPreferences(UUID userId, User user, String theme, String language, String aiPersonality, Boolean notificationsEnabled, String dataPrivacy, LocalDateTime updatedAt) {
+    public UserPreferences(UUID userId, User user, String theme, String language, String aiPersonality, Boolean notificationsEnabled, String dataPrivacy, String deepseekApiKey, LocalDateTime updatedAt) {
         this.userId = userId;
         this.user = user;
         this.theme = theme;
@@ -55,6 +58,7 @@ public class UserPreferences {
         this.aiPersonality = aiPersonality;
         this.notificationsEnabled = notificationsEnabled;
         this.dataPrivacy = dataPrivacy;
+        this.deepseekApiKey = deepseekApiKey;
         this.updatedAt = updatedAt;
     }
 
@@ -76,6 +80,8 @@ public class UserPreferences {
     public void setNotificationsEnabled(Boolean notificationsEnabled) { this.notificationsEnabled = notificationsEnabled; }
     public String getDataPrivacy() { return dataPrivacy; }
     public void setDataPrivacy(String dataPrivacy) { this.dataPrivacy = dataPrivacy; }
+    public String getDeepseekApiKey() { return deepseekApiKey; }
+    public void setDeepseekApiKey(String deepseekApiKey) { this.deepseekApiKey = deepseekApiKey; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 
@@ -87,6 +93,7 @@ public class UserPreferences {
         private String aiPersonality = "empathetic";
         private Boolean notificationsEnabled = true;
         private String dataPrivacy = "standard";
+        private String deepseekApiKey;
         private LocalDateTime updatedAt;
 
         public UserPreferencesBuilder userId(UUID userId) { this.userId = userId; return this; }
@@ -96,10 +103,11 @@ public class UserPreferences {
         public UserPreferencesBuilder aiPersonality(String aiPersonality) { this.aiPersonality = aiPersonality; return this; }
         public UserPreferencesBuilder notificationsEnabled(Boolean notificationsEnabled) { this.notificationsEnabled = notificationsEnabled; return this; }
         public UserPreferencesBuilder dataPrivacy(String dataPrivacy) { this.dataPrivacy = dataPrivacy; return this; }
+        public UserPreferencesBuilder deepseekApiKey(String deepseekApiKey) { this.deepseekApiKey = deepseekApiKey; return this; }
         public UserPreferencesBuilder updatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
 
         public UserPreferences build() {
-            return new UserPreferences(userId, user, theme, language, aiPersonality, notificationsEnabled, dataPrivacy, updatedAt);
+            return new UserPreferences(userId, user, theme, language, aiPersonality, notificationsEnabled, dataPrivacy, deepseekApiKey, updatedAt);
         }
     }
 }

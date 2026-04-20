@@ -38,6 +38,8 @@ management:
 # 自定义应用配置 (Security & JWT)
 application:
   security:
+    crypto:
+      secret-key: ${APP_CRYPTO_SECRET_KEY:${JWT_SECRET_KEY:dev-only-unsafe-secret-change-me}}
     jwt:
       # JWT 签名密钥 (必须是 Base64 编码，且长度至少 256 bit / 32 bytes)
       # 这里提供一个默认的用于测试的密钥，生产环境必须通过环境变量注入！

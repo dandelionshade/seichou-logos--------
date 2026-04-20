@@ -1,7 +1,7 @@
 # Seichou-Logos (成長の軌跡) - Backend Architecture
 
 ## 1. Overview
-This backend is designed using **Java 17** and **Spring Boot 3**, following Japanese enterprise development standards. It integrates with LLM APIs to perform cognitive reframing of user emotions.
+This backend is designed using **Java 21** and **Spring Boot 3**, following Japanese enterprise development standards. It integrates with LLM APIs to perform cognitive reframing of user emotions.
 
 ## 2. Directory Structure
 - `backend/sql/`: Database DDL scripts (PostgreSQL).
@@ -15,7 +15,7 @@ This backend is designed using **Java 17** and **Spring Boot 3**, following Japa
 - **PostgreSQL JSONB**: Efficiently stores unstructured AI insights and dynamic growth metrics.
 
 ## 4. Tech Stack
-- Java 17 / Spring Boot 3
+- Java 21 / Spring Boot 3
 - Spring Data JPA
 - PostgreSQL (with JSONB support)
 - Lombok

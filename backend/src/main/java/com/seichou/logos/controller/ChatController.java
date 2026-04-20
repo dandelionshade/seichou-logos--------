@@ -43,13 +43,16 @@ public class ChatController {
 
     @PostMapping
     @Operation(summary = "前端会话聊天接口")
-    public ResponseEntity<Map<String, Object>> chat(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<Map<String, Object>> chat(
+            @AuthenticationPrincipal User user,
+            @RequestBody Map<String, Object> request
+    ) {
         @SuppressWarnings("unchecked")
         List<Map<String, String>> messages = (List<Map<String, String>>) request.getOrDefault("messages", List.of());
         @SuppressWarnings("unchecked")
         Map<String, Object> userContext = (Map<String, Object>) request.getOrDefault("userContext", Map.of());
         String therapyMode = String.valueOf(request.getOrDefault("therapyMode", "adlerian"));
 
-        return ResponseEntity.ok(chatService.chat(messages, userContext, therapyMode));
+        return ResponseEntity.ok(chatService.chat(user, messages, userContext, therapyMode));
     }
 }

@@ -86,16 +86,17 @@ public class BoardController {
             return userStatsRepository.save(stats);
         }
 
-        UserStats stats = UserStats.builder()
-                .user(user)
-                .level(1)
-                .vitalityExp(0)
-                .flowExp(0)
-                .sparkExp(0)
-                .echoExp(0)
-                .resilienceExp(0)
-                .maxExp(100)
-                .build();
+        UserStats stats = new UserStats();
+        stats.setUser(user);
+        stats.setUserId(user.getUserId());
+        stats.setLevel(1);
+        stats.setVitalityExp(0);
+        stats.setFlowExp(0);
+        stats.setSparkExp(0);
+        stats.setEchoExp(0);
+        stats.setResilienceExp(0);
+        stats.setMaxExp(100);
+        stats.setUnlockedBadgesRaw("");
         return userStatsRepository.save(stats);
     }
 }

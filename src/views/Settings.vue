@@ -1,17 +1,32 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { 
+import { useRoute } from 'vue-router';
+import {
   Moon, Sun, Bell, Shield, Save, Loader2, 
-  Languages, Brain, Download, Trash2, CheckCircle2 
+  Languages, Brain, Download, Trash2, CheckCircle2, KeyRound
 } from 'lucide-vue-next';
 import { usePreferenceStore } from '@/store/preferenceStore';
 
 const { t } = useI18n();
+const route = useRoute();
 const prefStore = usePreferenceStore();
 
 const isSaving = ref(false);
 const showSuccess = ref(false);
+const deepseekApiKeyInput = ref('');
+const isSavingApiKey = ref(false);
+const apiKeyMessage = ref('');
+
+onMounted(async () => {
+  if (prefStore.loading) return;
+  if (!prefStore.hasDeepseekApiKey) {
+    await prefStore.fetchPreferences();
+  }
+  if (route.query.llm === 'setup') {
+    apiKeyMessage.value = '请先完成 DeepSeek API Key 绑定，再继续使用 AI 能力。';
+  }
+});
 
 const saveSettings = async () => {
   isSaving.value = true;
@@ -41,6 +56,26 @@ const clearData = () => {
   if (confirm('Are you sure you want to clear all local data? This action cannot be undone.')) {
     localStorage.clear();
     window.location.reload();
+  }
+};
+
+const saveDeepseekApiKey = async () => {
+  const trimmed = deepseekApiKeyInput.value.trim();
+  if (!trimmed) {
+    apiKeyMessage.value = '请输入有效的 DeepSeek API Key。';
+    return;
+  }
+
+  isSavingApiKey.value = true;
+  apiKeyMessage.value = '';
+  try {
+    await prefStore.updateDeepseekApiKey(trimmed);
+    deepseekApiKeyInput.value = '';
+    apiKeyMessage.value = 'DeepSeek API Key 已绑定到当前账户。';
+  } catch (error: any) {
+    apiKeyMessage.value = error?.message || '绑定失败，请稍后重试。';
+  } finally {
+    isSavingApiKey.value = false;
   }
 };
 </script>
@@ -80,6 +115,39 @@ const clearData = () => {
     </Transition>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- LLM API Setup -->
+      <div class="md:col-span-2 bg-card-bg border border-border rounded-2xl overflow-hidden shadow-sm p-6">
+        <h3 class="text-xs font-bold uppercase tracking-widest text-ink-dim mb-4 flex items-center gap-2">
+          <KeyRound :size="14" class="text-accent-glow" /> LLM API Access
+        </h3>
+
+        <p class="text-xs text-ink-dim mb-4">
+          绑定后会优先使用你账户下的 DeepSeek API Key（按用户生效，可后续覆盖更新）。
+        </p>
+
+        <div class="flex flex-col md:flex-row gap-3">
+          <input
+            v-model="deepseekApiKeyInput"
+            type="password"
+            placeholder="sk-..."
+            class="flex-1 bg-bg border border-border rounded-lg px-3 py-2 text-xs text-ink focus:ring-1 focus:ring-accent-glow focus:border-accent-glow outline-none"
+          />
+          <button
+            @click="saveDeepseekApiKey"
+            :disabled="isSavingApiKey"
+            class="px-4 py-2 rounded-lg bg-accent-glow text-bg text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-colors disabled:opacity-70"
+          >
+            <Loader2 v-if="isSavingApiKey" class="animate-spin" :size="14" />
+            <span v-else>绑定 Key</span>
+          </button>
+        </div>
+
+        <p class="mt-3 text-[11px]" :class="prefStore.hasDeepseekApiKey ? 'text-green-400' : 'text-amber-400'">
+          {{ prefStore.hasDeepseekApiKey ? '当前账户已绑定 DeepSeek API Key。' : '当前账户尚未绑定 DeepSeek API Key。' }}
+        </p>
+        <p v-if="apiKeyMessage" class="mt-2 text-[11px] text-ink-dim">{{ apiKeyMessage }}</p>
+      </div>
+
       <!-- Appearance -->
       <div class="bg-card-bg border border-border rounded-2xl overflow-hidden shadow-sm p-6">
         <h3 class="text-xs font-bold uppercase tracking-widest text-ink-dim mb-6 flex items-center gap-2">

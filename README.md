@@ -45,7 +45,7 @@
 1. **前端 (Frontend)**: `Vue 3` + `Vite` + `TypeScript` + `Tailwind CSS` + `Pinia` + `Vue Router`。
    - **API 驱动**: 所有 Store（Auth, Board, Log, Preference）均已重构，通过统一的 `apiFetch` 工具与后端通信。
    - **实时同步**: 用户偏好、看板任务、成长数据及聊天记录均实现云端持久化。
-2. **生产后端 (Production Backend)**: 位于 `/backend` 目录，基于 `Java 17` + `Spring Boot 3` + `Spring Data JPA` + `PostgreSQL` 构建。
+2. **生产后端 (Production Backend)**: 位于 `/backend` 目录，基于 `Java 21` + `Spring Boot 3` + `Spring Data JPA` + `PostgreSQL` 构建。
    - **Schema 补全**: 已完成包含用户统计、偏好、看板（支持长期目标与里程碑）、聊天记录及情绪分析在内的完整数据库设计。
 3. **预览/开发代理 (Preview Proxy)**: 根目录下的 `server.ts` 是一个功能完备的 Node.js/Express 服务。
    - **Mock 数据库**: 在 AI Studio 预览环境中提供内存级数据持久化，模拟真实的 Java 后端行为，确保开发与演示的连贯性。
@@ -60,8 +60,8 @@
 在你的 Java 项目中，可以直接导入此 JSON 并使用工具（如 Swagger Codegen 或 OpenAPI Generator）一键生成 Java DTO 和 Controller 接口代码。
 
 ### 1. 环境准备 (Prerequisites)
-- [Node.js](https://nodejs.org/) (v18+)
-- [Java JDK](https://adoptium.net/) (v17+)
+- [Node.js](https://nodejs.org/) (v20+)
+- [Java JDK](https://adoptium.net/) (v21+)
 - [Maven](https://maven.apache.org/) (v3.8+)
 - [Docker](https://www.docker.com/) & Docker Compose
 
@@ -71,10 +71,20 @@
 DEEPSEEK_API_KEY=your_api_key_here
 ```
 
+#### 无 Key 降级模式说明 (No-Key Degraded Mode)
+如果未配置 `DEEPSEEK_API_KEY`（或值为占位符），Node 预览后端仍可运行，但部分 AI 能力会进入降级模式：
+- `POST /api/reframe`: 返回本地 fallback 的情绪分析结构（可用于前端联调）。
+- `POST /api/chat`: 返回本地 fallback 的陪伴式回复，`action` 为 `null`。
+- `POST /api/settle`: 返回 mock 结算结果。
+- `POST /api/low-battery`: 返回 mock 安抚文案与经验值。
+- `POST /api/reports/weekly`: 返回 mock Markdown 周报。
+
+建议在联调/验收环境配置真实 Key，以获得完整 AI 质量与行为表现。
+
 ### 3. 启动数据库 (Start Database)
 项目根目录提供了 `docker-compose.yml`，一键启动 PostgreSQL：
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ### 4. 启动后端服务 (Start Spring Boot Backend)
@@ -86,13 +96,61 @@ mvn spring-boot:run
 ```
 *后端服务将运行在 `http://localhost:8080`*
 
-### 5. 启动前端服务 (Start Frontend)
-打开一个新的终端，在项目根目录安装依赖并启动 Vite：
+### 5. 启动本地开发服务 (Start Local Dev Server)
+打开一个新的终端，在项目根目录安装依赖并启动 Node 预览后端（内置 Vite 中间件）：
 ```bash
 npm install
 npm run dev
 ```
-*前端服务将运行在 `http://localhost:3000` 或 `http://localhost:5173`*
+*默认访问地址为 `http://localhost:3000`，如端口冲突可用 `PORT=3001 npm run dev` 覆盖端口。*
+
+## ☁️ 推送到 GitHub 并在 PC + IntelliJ IDEA 继续开发（单开发者）
+
+### 1. 推送前快速自检（本机）
+```bash
+git --no-pager status --short
+npm run lint
+npm run build
+docker compose config
+```
+
+### 2. 首次绑定远程并推送（本机）
+将 `<your-github-repo-url>` 替换为你的仓库地址：
+```bash
+git remote add origin <your-github-repo-url>
+```
+
+如果 `origin` 已存在，改用：
+```bash
+git remote set-url origin <your-github-repo-url>
+```
+
+然后执行：
+```bash
+git branch -M main
+git add .
+git commit -m "chore: pre-push stabilization and docs handoff"
+git push -u origin main
+```
+
+### 3. 在 Windows PC + IntelliJ IDEA 接续开发
+```bash
+git clone <your-github-repo-url>
+cd EnjoyLifeProject
+npm install
+npm run dev
+```
+
+复制环境变量模板可按你使用的终端选择：
+```powershell
+Copy-Item .env.example .env
+```
+
+```cmd
+copy .env.example .env
+```
+
+建议在 IDEA 中打开项目后，先确认 Node/JDK 版本：Node `>=20`、Java `>=21`。`.env` 不会被提交；请在 PC 本地填入你自己的 `DEEPSEEK_API_KEY`。
 
 ## 🤝 参与贡献 (Contributing)
 

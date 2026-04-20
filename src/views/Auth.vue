@@ -2,10 +2,12 @@
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/authStore';
+import { usePreferenceStore } from '@/store/preferenceStore';
 import { Mail, Lock, AlertCircle, Loader2, ArrowRight } from 'lucide-vue-next';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const preferenceStore = usePreferenceStore();
 
 const isLogin = ref(true); // Toggle between Login and Register modes
 const email = ref('');
@@ -58,6 +60,14 @@ const handleSubmit = async () => {
     } else {
       await authStore.register(email.value, password.value);
     }
+
+    // 登录后先拉取偏好，未配置 API key 时引导进入 LLM 接入窗口。
+    await preferenceStore.fetchPreferences();
+    if (!preferenceStore.hasDeepseekApiKey) {
+      router.push('/settings?llm=setup');
+      return;
+    }
+
     // Redirect to dashboard on success
     router.push('/');
   } catch (error: any) {

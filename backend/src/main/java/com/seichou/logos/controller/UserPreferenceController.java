@@ -38,12 +38,14 @@ public class UserPreferenceController {
     }
 
     private Map<String, Object> toResponse(UserPreferences prefs) {
+        boolean hasDeepseekApiKey = prefs.getDeepseekApiKey() != null && !prefs.getDeepseekApiKey().isBlank();
         return Map.of(
                 "theme", prefs.getTheme(),
                 "language", prefs.getLanguage(),
                 "aiPersonality", prefs.getAiPersonality(),
                 "notificationsEnabled", prefs.getNotificationsEnabled(),
-                "dataPrivacy", prefs.getDataPrivacy()
+                "dataPrivacy", prefs.getDataPrivacy(),
+                "hasDeepseekApiKey", hasDeepseekApiKey
         );
     }
 }

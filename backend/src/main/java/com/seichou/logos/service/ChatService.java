@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -28,6 +27,7 @@ public class ChatService {
     private static final Logger logger = Logger.getLogger(ChatService.class.getName());
 
     private final ChatMessageRepository repository;
+    private final UserPreferenceService userPreferenceService;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
@@ -37,8 +37,14 @@ public class ChatService {
     @Value("${deepseek.api.key}")
     private String apiKey;
 
-    public ChatService(ChatMessageRepository repository, RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public ChatService(
+            ChatMessageRepository repository,
+            UserPreferenceService userPreferenceService,
+            RestTemplate restTemplate,
+            ObjectMapper objectMapper
+    ) {
         this.repository = repository;
+        this.userPreferenceService = userPreferenceService;
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
     }
@@ -47,8 +53,8 @@ public class ChatService {
         return repository.findByUserOrderByCreatedAtAsc(user);
     }
 
-    public Map<String, Object> chat(List<Map<String, String>> messages, Map<String, Object> userContext, String therapyMode) {
-        String reply = callAi(messages, userContext, therapyMode);
+    public Map<String, Object> chat(User user, List<Map<String, String>> messages, Map<String, Object> userContext, String therapyMode) {
+        String reply = callAi(messages, userContext, therapyMode, resolveApiKey(user));
         Map<String, Object> response = new HashMap<>();
         response.put("reply", reply);
         response.put("action", null);
@@ -75,7 +81,7 @@ public class ChatService {
             message.put("content", messageItem.getContent());
             messages.add(message);
         }
-        String aiReply = callAi(messages, Map.of("userId", user.getUserId().toString()), "adlerian");
+        String aiReply = callAi(messages, Map.of("userId", user.getUserId().toString()), "adlerian", resolveApiKey(user));
 
         // 4. 保存 AI 回复
         ChatMessage assistantMessage = new ChatMessage();
@@ -85,10 +91,10 @@ public class ChatService {
         return repository.save(assistantMessage);
     }
 
-    private String callAi(List<Map<String, String>> history, Map<String, Object> userContext, String therapyMode) {
+    private String callAi(List<Map<String, String>> history, Map<String, Object> userContext, String therapyMode, String bearerApiKey) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(apiKey);
+        headers.setBearerAuth(bearerApiKey);
 
         List<Map<String, String>> messages = new ArrayList<>();
         Map<String, String> systemMessage = new HashMap<>();
@@ -117,5 +123,15 @@ public class ChatService {
             logger.log(Level.SEVERE, "Chat AI call failed", e);
             return "I'm sorry, I'm having trouble connecting right now. But I'm still here for you.";
         }
+    }
+
+    private String resolveApiKey(User user) {
+        if (user != null) {
+            String userBoundApiKey = userPreferenceService.resolveDeepseekApiKey(user.getUserId());
+            if (userBoundApiKey != null && !userBoundApiKey.isBlank()) {
+                return userBoundApiKey;
+            }
+        }
+        return apiKey;
     }
 }

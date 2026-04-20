@@ -2,13 +2,53 @@ import express from "express"; // 引入 Express 框架
 import { createServer as createViteServer } from "vite"; // 引入 Vite
 import path from "path";
 import dotenv from "dotenv";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 
 // 加载 .env 文件中的环境变量
 dotenv.config();
 
+const ACTIVE_LLM = process.env.ACTIVE_LLM || 'deepseek';
+const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, '');
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'deepseek-chat';
+const CHAT_COMPLETIONS_URL = `${OPENAI_BASE_URL}/chat/completions`;
+const API_KEY_CIPHER_PREFIX = 'enc:v1:';
+const API_KEY_ENCRYPTION_SECRET = process.env.APP_CRYPTO_SECRET_KEY || process.env.JWT_SECRET_KEY || 'dev-only-unsafe-secret-change-me';
+const API_KEY_AES_KEY = createHash('sha256').update(API_KEY_ENCRYPTION_SECRET).digest();
+
+const encryptApiKey = (plainText: string) => {
+  const normalized = plainText.trim();
+  if (!normalized) return '';
+
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', API_KEY_AES_KEY, iv);
+  const encrypted = Buffer.concat([cipher.update(normalized, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${API_KEY_CIPHER_PREFIX}${Buffer.concat([iv, tag, encrypted]).toString('base64')}`;
+};
+
+const decryptApiKeyIfNeeded = (stored: string | undefined) => {
+  if (!stored) return '';
+  if (!stored.startsWith(API_KEY_CIPHER_PREFIX)) {
+    return stored;
+  }
+
+  try {
+    const payload = Buffer.from(stored.slice(API_KEY_CIPHER_PREFIX.length), 'base64');
+    const iv = payload.subarray(0, 12);
+    const tag = payload.subarray(12, 28);
+    const ciphertext = payload.subarray(28);
+    const decipher = createDecipheriv('aes-256-gcm', API_KEY_AES_KEY, iv);
+    decipher.setAuthTag(tag);
+    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+    return decrypted;
+  } catch {
+    return '';
+  }
+};
+
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
 
   app.use(express.json());
 
@@ -34,7 +74,7 @@ async function startServer() {
   // 当临时服务重启时，这些内存数据会被清空。为此我们添加一个默认账号应对。
   // ==========================================
   const mockUsers: any[] = [
-    { id: 'admin-1', email: 'admin@seichou.com', password: 'password123', name: '先行者', bio: '正在测试全新成长引擎' }
+    { id: 'admin-1', email: 'admin@seichou.com', password: 'password123', role: 'ADMIN', name: '先行者', bio: '正在测试全新成长引擎' }
   ];
   const mockCards: any[] = [
     { id: '1', title: '完成一次5公里晨跑', description: '保持配速在6分钟内', category: 'health', tags: ['健康', '微习惯'], status: 'todo' },
@@ -56,8 +96,51 @@ async function startServer() {
     epiphanyMultiplier: 1.0,
     unlockedBadges: ['early_bird', 'resilience_init'] as string[]
   };
-  const mockPreferences = { theme: 'dark', language: 'en', aiPersonality: 'empathetic', notificationsEnabled: true, dataPrivacy: 'standard' };
+  type MockPreferences = {
+    theme: string;
+    language: string;
+    aiPersonality: string;
+    notificationsEnabled: boolean;
+    dataPrivacy: string;
+    deepseekApiKeyCiphertext?: string;
+  };
+  const createDefaultPreferences = (): MockPreferences => ({
+    theme: 'dark',
+    language: 'en',
+    aiPersonality: 'empathetic',
+    notificationsEnabled: true,
+    dataPrivacy: 'standard',
+    deepseekApiKeyCiphertext: ''
+  });
+  const userPreferences = new Map<string, MockPreferences>();
+  userPreferences.set('admin-1', {
+    ...createDefaultPreferences(),
+    deepseekApiKeyCiphertext: process.env.DEEPSEEK_API_KEY ? encryptApiKey(process.env.DEEPSEEK_API_KEY) : ''
+  });
   const mockLogs: any[] = [];
+
+  const resolveUserIdFromAuthHeader = (authorization?: string) => {
+    if (!authorization || !authorization.startsWith('Bearer ')) return null;
+    const token = authorization.split(' ')[1];
+    if (!token || !token.startsWith('mock-jwt-token-')) return null;
+    return token.replace('mock-jwt-token-', '');
+  };
+
+  const getOrCreatePreferences = (userId: string) => {
+    if (!userPreferences.has(userId)) {
+      userPreferences.set(userId, createDefaultPreferences());
+    }
+    return userPreferences.get(userId)!;
+  };
+
+  const resolveDeepseekKey = (req: express.Request) => {
+    const userId = resolveUserIdFromAuthHeader(req.headers.authorization);
+    if (userId) {
+      const userKey = decryptApiKeyIfNeeded(getOrCreatePreferences(userId).deepseekApiKeyCiphertext).trim();
+      if (userKey) return userKey;
+    }
+    return process.env.DEEPSEEK_API_KEY;
+  };
 
   app.post("/api/auth/register", (req, res) => {
     const { email, password } = req.body;
@@ -73,16 +156,18 @@ async function startServer() {
     const newUser = {
       id: Date.now().toString(),
       email,
-      password 
+      password,
+      role: 'USER'
     };
     
     mockUsers.push(newUser);
+    userPreferences.set(newUser.id, createDefaultPreferences());
     
     const mockToken = `mock-jwt-token-${newUser.id}`;
     
     res.json({
       token: mockToken,
-      user: { id: newUser.id, email: newUser.email }
+      user: { id: newUser.id, email: newUser.email, role: newUser.role }
     });
   });
 
@@ -99,10 +184,11 @@ async function startServer() {
     }
     
     const mockToken = `mock-jwt-token-${user.id}`;
+    getOrCreatePreferences(user.id);
     
     res.json({
       token: mockToken,
-      user: { id: user.id, email: user.email, name: user.name, bio: user.bio }
+      user: { id: user.id, email: user.email, role: user.role || 'USER', name: user.name, bio: user.bio }
     });
   });
 
@@ -136,12 +222,46 @@ async function startServer() {
 
   // Preferences API
   apiRouter.get("/preferences", (req, res) => {
-    res.json(mockPreferences);
+    const userId = resolveUserIdFromAuthHeader(req.headers.authorization);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const prefs = getOrCreatePreferences(userId);
+    res.json({
+      theme: prefs.theme,
+      language: prefs.language,
+      aiPersonality: prefs.aiPersonality,
+      notificationsEnabled: prefs.notificationsEnabled,
+      dataPrivacy: prefs.dataPrivacy,
+      hasDeepseekApiKey: !!decryptApiKeyIfNeeded(prefs.deepseekApiKeyCiphertext),
+      deepseekApiKey: undefined
+    });
   });
 
   apiRouter.put("/preferences", (req, res) => {
-    Object.assign(mockPreferences, req.body);
-    res.json(mockPreferences);
+    const userId = resolveUserIdFromAuthHeader(req.headers.authorization);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const prefs = getOrCreatePreferences(userId);
+    if (typeof req.body.theme === 'string') prefs.theme = req.body.theme;
+    if (typeof req.body.language === 'string') prefs.language = req.body.language;
+    if (typeof req.body.aiPersonality === 'string') prefs.aiPersonality = req.body.aiPersonality;
+    if (typeof req.body.notificationsEnabled === 'boolean') prefs.notificationsEnabled = req.body.notificationsEnabled;
+    if (typeof req.body.dataPrivacy === 'string') prefs.dataPrivacy = req.body.dataPrivacy;
+    if (typeof req.body.deepseekApiKey === 'string') {
+      prefs.deepseekApiKeyCiphertext = encryptApiKey(req.body.deepseekApiKey);
+    }
+
+    res.json({
+      theme: prefs.theme,
+      language: prefs.language,
+      aiPersonality: prefs.aiPersonality,
+      notificationsEnabled: prefs.notificationsEnabled,
+      dataPrivacy: prefs.dataPrivacy,
+      hasDeepseekApiKey: !!decryptApiKeyIfNeeded(prefs.deepseekApiKeyCiphertext),
+      deepseekApiKey: undefined
+    });
   });
 
   // Logs API
@@ -167,7 +287,7 @@ async function startServer() {
       email: user.email,
       name: user.name || "Seichou User",
       bio: user.bio || "A passionate learner on a journey of growth.",
-      role: "USER",
+      role: user.role || "USER",
       joinedAt: user.joinedAt || new Date().toISOString()
     });
   });
@@ -193,7 +313,7 @@ async function startServer() {
       email: mockUsers[userIndex].email,
       name: mockUsers[userIndex].name || "Seichou User",
       bio: mockUsers[userIndex].bio || "A passionate learner on a journey of growth.",
-      role: "USER",
+      role: mockUsers[userIndex].role || "USER",
       joinedAt: mockUsers[userIndex].joinedAt || new Date().toISOString()
     });
   });
@@ -232,13 +352,35 @@ async function startServer() {
   apiRouter.post("/reframe", async (req, res) => {
     try {
       const { content, therapyMode = 'adlerian' } = req.body;
-      const apiKey = process.env.DEEPSEEK_API_KEY;
+      const apiKey = resolveDeepseekKey(req);
 
-      if (!apiKey || apiKey === "your_deepseek_api_key_here") {
-        return res.status(500).json({ error: "DEEPSEEK_API_KEY 未配置。" });
-      }
       if (!content) {
         return res.status(400).json({ error: "内容不能为空。" });
+      }
+
+      if (!apiKey || apiKey === "your_deepseek_api_key_here") {
+        const fallbackResult = {
+          primary_emotion: "需要被接住的疲惫",
+          reframed_insight: "我们先不急着解决一切。你愿意把真实感受说出来，本身就说明你在认真照顾自己，这已经是成长在发生。",
+          growth_assets: {
+            接纳之力: 8,
+            觉察之芽: 6
+          },
+          ai_insight_details: {
+            real_need: "你需要被理解、被允许慢下来，而不是继续苛责自己。",
+            recommendation: "现在先做三次缓慢深呼吸，然后喝一口温水，告诉自己：我已经在变好了。"
+          }
+        };
+
+        const newLog = {
+          logId: Date.now().toString(),
+          logDate: new Date().toISOString().split('T')[0],
+          content,
+          emotionAnalysis: fallbackResult
+        };
+        mockLogs.unshift(newLog);
+
+        return res.json(fallbackResult);
       }
 
       const modeDescriptions: Record<string, string> = {
@@ -274,14 +416,18 @@ async function startServer() {
       }
       `;
 
-      const response = await fetch("https://api.deepseek.com/chat/completions", {
+      if (ACTIVE_LLM !== 'deepseek') {
+        return res.status(400).json({ error: `Unsupported ACTIVE_LLM: ${ACTIVE_LLM}` });
+      }
+
+      const response = await fetch(CHAT_COMPLETIONS_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: "deepseek-chat",
+          model: OPENAI_MODEL,
           messages: [
             { role: "system", content: "You are a compassionate growth partner. Always output valid JSON." },
             { role: "user", content: prompt }
@@ -319,10 +465,18 @@ async function startServer() {
   apiRouter.post("/chat", async (req, res) => {
     try {
       const { messages, userContext, therapyMode = 'adlerian' } = req.body;
-      const apiKey = process.env.DEEPSEEK_API_KEY;
+      const apiKey = resolveDeepseekKey(req);
 
       if (!apiKey || apiKey === "your_deepseek_api_key_here") {
-        return res.status(500).json({ error: "DEEPSEEK_API_KEY 未配置。" });
+        const latestUserMessage = Array.isArray(messages)
+          ? [...messages].reverse().find(m => m?.role === 'user')?.content
+          : undefined;
+        return res.json({
+          reply: latestUserMessage
+            ? `我收到了你刚刚的话："${String(latestUserMessage).slice(0, 80)}"。我们先从最小一步开始，今天你愿意为自己做一件 5 分钟内能完成的小事吗？`
+            : '我在这里，我们可以慢慢来。先从一件最小、最温柔的行动开始就好。',
+          action: null
+        });
       }
 
       const modeDescriptions: Record<string, string> = {
@@ -365,14 +519,18 @@ async function startServer() {
         ...messages
       ];
 
-      const response = await fetch("https://api.deepseek.com/chat/completions", {
+      if (ACTIVE_LLM !== 'deepseek') {
+        return res.status(400).json({ error: `Unsupported ACTIVE_LLM: ${ACTIVE_LLM}` });
+      }
+
+      const response = await fetch(CHAT_COMPLETIONS_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: "deepseek-chat",
+          model: OPENAI_MODEL,
           messages: apiMessages,
           response_format: { type: "json_object" }
         })
@@ -401,7 +559,7 @@ async function startServer() {
   apiRouter.post("/settle", async (req, res) => {
     try {
       const { cards, feeling } = req.body;
-      const apiKey = process.env.DEEPSEEK_API_KEY;
+      const apiKey = resolveDeepseekKey(req);
 
       if (!cards || !Array.isArray(cards) || cards.length === 0) {
         return res.status(400).json({ error: "No cards provided for settlement." });
@@ -509,14 +667,18 @@ async function startServer() {
       }
       `;
 
-      const response = await fetch("https://api.deepseek.com/chat/completions", {
+      if (ACTIVE_LLM !== 'deepseek') {
+        return res.status(400).json({ error: `Unsupported ACTIVE_LLM: ${ACTIVE_LLM}` });
+      }
+
+      const response = await fetch(CHAT_COMPLETIONS_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: "deepseek-chat",
+          model: OPENAI_MODEL,
           messages: [
             { role: "system", content: "You are the most inclusive growth partner. Always output JSON." },
             { role: "user", content: prompt }
@@ -568,7 +730,7 @@ async function startServer() {
   // ==========================================
   apiRouter.post("/low-battery", async (req, res) => {
     try {
-      const apiKey = process.env.DEEPSEEK_API_KEY;
+      const apiKey = resolveDeepseekKey(req);
       mockStats.resilienceExp += 10;
       // Increase modifier due to struggle accumulating resilience dividends
       mockStats.epiphanyMultiplier = Math.min(3.0, (mockStats.epiphanyMultiplier || 1.0) + 0.2);
@@ -584,14 +746,18 @@ async function startServer() {
       告诉他/她：你的价值不取决于你的“电量”或“产出”。允许自己彻底休息，是这个星球上最勇敢的行为之一。
       字数：50-80字，语气：极度亲昵。`;
 
-      const response = await fetch("https://api.deepseek.com/chat/completions", {
+      if (ACTIVE_LLM !== 'deepseek') {
+        return res.status(400).json({ error: `Unsupported ACTIVE_LLM: ${ACTIVE_LLM}` });
+      }
+
+      const response = await fetch(CHAT_COMPLETIONS_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: "deepseek-chat",
+          model: OPENAI_MODEL,
           messages: [
             { role: "system", content: "You are a compassionate growth partner. Always output JSON." },
             { role: "user", content: `JSON 格式: {"message": "你的回应内容"}。内容: ${prompt}` }
@@ -623,7 +789,7 @@ async function startServer() {
   apiRouter.post("/reports/weekly", async (req, res) => {
     try {
       const { logs, cards } = req.body;
-      const apiKey = process.env.DEEPSEEK_API_KEY;
+      const apiKey = resolveDeepseekKey(req);
 
       if (!apiKey || apiKey === "your_deepseek_api_key_here") {
         return res.json({
@@ -707,6 +873,7 @@ async function startServer() {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[Server] 服务器启动成功，监听端口: ${PORT}`);
     console.log(`[Server] API 基础路径: /api`);
+    console.log(`[Server] ACTIVE_LLM: ${ACTIVE_LLM}, MODEL: ${OPENAI_MODEL}`);
   });
 }
 

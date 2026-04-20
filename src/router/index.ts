@@ -1,13 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import MainLayout from '@/layout/MainLayout.vue';
-import Dashboard from '@/views/Dashboard.vue';
-import History from '@/views/History.vue';
-import Reports from '@/views/Reports.vue';
-import Settings from '@/views/Settings.vue';
-import Profile from '@/views/Profile.vue';
-import Auth from '@/views/Auth.vue';
-import ChatRoom from '@/views/ChatRoom.vue';
-import TreeGarden from '@/views/TreeGarden.vue';
 import { useAuthStore } from '@/store/authStore';
 
 // 创建路由实例
@@ -17,21 +8,21 @@ const router = createRouter({
     {
       path: '/auth',
       name: 'Auth',
-      component: Auth,
+      component: () => import('@/views/Auth.vue'),
       meta: { requiresGuest: true }
     },
     {
       path: '/',
-      component: MainLayout, // 根路径使用 MainLayout 作为布局
+      component: () => import('@/layout/MainLayout.vue'), // 根路径使用 MainLayout 作为布局
       meta: { requiresAuth: true },
       children: [
-        { path: '', name: 'Dashboard', component: Dashboard }, // 默认子路由：工作台
-        { path: 'chat', name: 'ChatRoom', component: ChatRoom }, // 智聊室
-        { path: 'history', name: 'History', component: History }, // 历史记录页
-        { path: 'reports', name: 'Reports', component: Reports }, // AI 报告页
-        { path: 'garden', name: 'TreeGarden', component: TreeGarden }, // 养成花园页
-        { path: 'settings', name: 'Settings', component: Settings }, // 设置页
-        { path: 'profile', name: 'Profile', component: Profile }, // 个人主页
+        { path: '', name: 'Dashboard', component: () => import('@/views/Dashboard.vue') }, // 默认子路由：工作台
+        { path: 'chat', name: 'ChatRoom', component: () => import('@/views/ChatRoom.vue') }, // 智聊室
+        { path: 'history', name: 'History', component: () => import('@/views/History.vue') }, // 历史记录页
+        { path: 'reports', name: 'Reports', component: () => import('@/views/Reports.vue') }, // AI 报告页
+        { path: 'garden', name: 'TreeGarden', component: () => import('@/views/TreeGarden.vue') }, // 养成花园页
+        { path: 'settings', name: 'Settings', component: () => import('@/views/Settings.vue') }, // 设置页
+        { path: 'profile', name: 'Profile', component: () => import('@/views/Profile.vue') }, // 个人主页
       ]
     }
   ]

@@ -13,6 +13,7 @@ export const usePreferenceStore = defineStore('preference', () => {
   const notifications = ref(localStorage.getItem('seichou_notifications') !== 'false');
   const aiPersonality = ref<AIPersonality>((localStorage.getItem('seichou_ai_personality') as AIPersonality) || 'empathetic');
   const dataPrivacy = ref<DataPrivacy>((localStorage.getItem('seichou_data_privacy') as DataPrivacy) || 'standard');
+  const hasDeepseekApiKey = ref(localStorage.getItem('seichou_has_deepseek_api_key') === 'true');
   const loading = ref(false);
 
   // Apply theme on init
@@ -34,10 +35,12 @@ export const usePreferenceStore = defineStore('preference', () => {
       notifications.value = data.notificationsEnabled;
       aiPersonality.value = data.aiPersonality;
       dataPrivacy.value = data.dataPrivacy;
+      hasDeepseekApiKey.value = !!data.hasDeepseekApiKey;
       
       // Update local storage and UI
       localStorage.setItem('seichou_theme', data.theme);
       localStorage.setItem('seichou_lang', data.language);
+      localStorage.setItem('seichou_has_deepseek_api_key', String(hasDeepseekApiKey.value));
       applyTheme(data.theme);
       i18n.global.locale.value = data.language as any;
     } catch (e) {
@@ -55,6 +58,21 @@ export const usePreferenceStore = defineStore('preference', () => {
       });
     } catch (e) {
       console.error('Failed to update preferences', e);
+    }
+  };
+
+  const updateDeepseekApiKey = async (apiKey: string) => {
+    loading.value = true;
+    try {
+      const data = await apiFetch('/preferences', {
+        method: 'PUT',
+        body: JSON.stringify({ deepseekApiKey: apiKey.trim() }),
+      });
+      hasDeepseekApiKey.value = !!data.hasDeepseekApiKey;
+      localStorage.setItem('seichou_has_deepseek_api_key', String(hasDeepseekApiKey.value));
+      return data;
+    } finally {
+      loading.value = false;
     }
   };
 
@@ -92,7 +110,9 @@ export const usePreferenceStore = defineStore('preference', () => {
     notifications,
     aiPersonality,
     dataPrivacy,
+    hasDeepseekApiKey,
     loading,
-    fetchPreferences
+    fetchPreferences,
+    updateDeepseekApiKey
   };
 });
