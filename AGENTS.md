@@ -3,6 +3,7 @@
 ## Scope and runtime reality
 - This repo is a Vue 3 + Vite frontend with two backend modes: a Node preview backend (`server.ts`) and a Spring Boot backend (`backend/`).
 - Day-to-day local dev defaults to the Node path: `npm run dev` runs `tsx server.ts` on port `3000` (not Vite dev server).
+- Node preview state is file-backed (`.data/preview-db.json`) rather than pure in-memory; override location with `PREVIEW_DATA_DIR`.
 - Frontend API calls are relative (`/api`) via `src/api/index.ts`, so whichever backend process owns `/api` defines behavior.
 - OpenAPI contract lives in `api-schema.json` and matches the Node preview API shape (`http://localhost:3000/api`).
 
@@ -13,11 +14,13 @@
 - Profile/preferences surface is split across stores: `authStore` (`/api/users/me`) and `preferenceStore` (`/api/preferences`, including user-bound DeepSeek key state).
 - Production backend uses layered Spring structure (`controller` -> `service` -> `repository` -> `entity`) under `backend/src/main/java/com/seichou/logos/`.
 - Security boundary is JWT-based in `backend/src/main/java/com/seichou/logos/security/SecurityConfig.java` + `JwtAuthenticationFilter.java`.
+- Spring also exposes placeholder analytics endpoints in `AnalyticsController` (`/api/analytics/growth-assets/summary`, `/api/analytics/insights/weekly`) that are not wired into current frontend flows.
 
 ## Critical end-to-end flows
 - Auth flow: `useAuthStore.login()` -> `apiFetch('/auth/login')` -> Node `server.ts` `/api/auth/login` OR Spring `AuthenticationController` `/api/auth/login`.
 - Preference/key flow: `usePreferenceStore.updateDeepseekApiKey()` -> `PUT /api/preferences` -> Node `server.ts` encrypts `deepseekApiKey` per user (AES-GCM) OR Spring `UserPreferenceController` persists user preference for downstream AI services.
 - Board settlement flow: `useBoardStore.settleExp()` -> `POST /api/settle` -> Node AI settlement in `server.ts` or deterministic fallback in Spring `GameplayController`.
+- Board delete flow: `useBoardStore.deleteCard()` -> `DELETE /api/board/cards/:id`; if backend route is unavailable, store falls back to local hide + tombstones (`deleted_board_card_ids_v1`) and later retries via `retryPermanentDelete()`/`refreshDeleteRouteHealth()`.
 - Emotion reframing flow: `useLogStore.reframeEmotion()` -> `POST /api/reframe` -> DeepSeek call in Node `server.ts` or Spring `EmotionReframingService`.
 - Chat mentor flow: `src/views/ChatRoom.vue` `sendMessage()` -> `POST /api/chat` -> Node `server.ts` `/api/chat` OR Spring `ChatController` `@PostMapping("/api/chat")`.
 - Weekly report flow: `src/views/Reports.vue` `generateWeeklyReport()` -> `POST /api/reports/weekly` -> markdown returned, then `marked` + `DOMPurify` render (Spring path currently in `GameplayController`).
@@ -30,11 +33,13 @@
 - Chat action payloads are not fully aligned; handle both `action.data.category` (Node contract) and `action.data.dimension` (current frontend consumption path).
 - Use existing category/status vocabulary exactly (`health|mind|career|social`, `todo|done|struggled|composted`).
 - Persist user/session UX state the same way existing stores do (`localStorage` keys in `authStore`, `chatStore`, `preferenceStore`).
+- Do not remove board delete fallback behavior in `boardStore` unless both backends are updated together: local tombstones + route probing are used to tolerate stale backend processes.
 
 ## Developer workflows
 - Node preview/fullstack-in-one:
   - `npm install`
   - `npm run dev`
+- Node preview data reset: delete `.data/preview-db.json` (or the directory pointed to by `PREVIEW_DATA_DIR`) when you need a clean local dataset.
 - Frontend build/typecheck:
   - `npm run build`
   - `npm run lint`
@@ -47,6 +52,7 @@
 ## Integrations and config touchpoints
 - DeepSeek key is required for non-mock AI behavior: `.env` (`DEEPSEEK_API_KEY`) and `backend/src/main/resources/application.yml` (`deepseek.api.key`).
 - Node preview uses OpenAI-compatible env knobs: `ACTIVE_LLM`, `OPENAI_BASE_URL`, `OPENAI_MODEL` (see `server.ts`).
+- Node preview persistence knobs: `PREVIEW_DATA_DIR` controls where `preview-db.json` is stored.
 - Node preview can use user-bound DeepSeek keys from `PUT /api/preferences`; encryption key source is `APP_CRYPTO_SECRET_KEY` (fallback `JWT_SECRET_KEY`), so keep it stable across restarts.
 - Node preview fallback behavior is endpoint-specific when DeepSeek key is missing: `/api/settle`, `/api/low-battery`, `/api/reports/weekly` return mock responses; `/api/reframe` and `/api/chat` now also return local fallback responses for frontend联调.
 - DB defaults are PostgreSQL (`seichou_logos`) in `docker-compose.yml` and `backend/src/main/resources/application.yml`.
